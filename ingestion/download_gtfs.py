@@ -40,6 +40,7 @@ def download_gtfs() -> Path:
     """
 
     date = datetime.now().strftime("%Y-%m-%d")
+
     output_dir = DATA_DIR / date
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -65,6 +66,7 @@ def download_gtfs() -> Path:
         "GTFS descargado correctamente: %s",
         output_file,
     )
+
     logger.info(
         "Tamaño del archivo: %.2f MB",
         output_file.stat().st_size / (1024 * 1024),
@@ -114,12 +116,42 @@ def validate_gtfs(gtfs_path: Path) -> None:
     logger.info("Archivos encontrados: %d", len(files))
 
 
+def extract_gtfs(gtfs_path: Path) -> Path:
+    """
+    Extraemos el ZIP GTFS en la carpeta extracted.
+    """
+
+    extracted_dir = gtfs_path.parent / "extracted"
+
+    extracted_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Extrayendo archivo GTFS...")
+
+    try:
+        with ZipFile(gtfs_path, "r") as zip_file:
+            zip_file.extractall(extracted_dir)
+
+    except BadZipFile as error:
+        raise ValueError(
+            "No se puede extraer el archivo porque no es un ZIP válido."
+        ) from error
+
+    logger.info(
+        "GTFS extraído correctamente: %s",
+        extracted_dir,
+    )
+
+    return extracted_dir
+
+
 def main():
     logger.info("URBANFLOW BARCELONA - TMB GTFS INGESTION")
 
     try:
         gtfs_path = download_gtfs()
         validate_gtfs(gtfs_path)
+        extract_gtfs(gtfs_path)
+
         logger.info("INGESTA COMPLETADA CORRECTAMENTE")
 
     except requests.RequestException as error:
@@ -129,7 +161,6 @@ def main():
     except (OSError, ValueError) as error:
         logger.error("Error procesando el GTFS: %s", error)
         raise
-
 
 if __name__ == "__main__":
     main()
