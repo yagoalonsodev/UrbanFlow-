@@ -1,0 +1,9 @@
+services:
+  ingestion:
+    build: .
+    container_name: urbanflow-ingestion
+    volumes:
+
+      - ./data:/app/data
+
+      - ./logs:/app/logs
