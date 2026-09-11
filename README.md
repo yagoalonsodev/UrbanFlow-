@@ -1510,6 +1510,75 @@ El proyecto se desarrollará progresivamente, incorporando cada componente de la
 
 ---
 
+## Resultados del análisis GTFS de TMB
+
+El análisis se realizó sobre la extracción `data/raw/tmb/2026-09-10/extracted` y está documentado de forma reproducible en [el notebook de análisis](notebooks/gtfs_analysis.ipynb). Se analizaron `agency.txt`, `routes.txt`, `trips.txt`, `stops.txt`, `stop_times.txt` y `calendar.txt`.
+
+### Volumen del feed
+
+| Dataset | Registros | Columnas |
+| --- | ---: | ---: |
+| `agency` | 1 | 5 |
+| `routes` | 116 | 7 |
+| `trips` | 60.537 | 7 |
+| `stops` | 3.445 | 9 |
+| `stop_times` | 1.391.617 | 5 |
+| `calendar` | 4 | 10 |
+
+La agencia es TMB, con zona horaria `Europe/Madrid`. El calendario contiene cuatro servicios: dos laborables y dos de fin de semana, con vigencias entre el 9 de septiembre de 2026 y el 27 de marzo de 2027.
+
+### Oferta de transporte y actividad programada
+
+| `route_type` | Medio | Rutas |
+| ---: | --- | ---: |
+| 3 | Autobús | 105 |
+| 1 | Metro | 10 |
+| 7 | Funicular/teleférico | 1 |
+
+Las cinco rutas con más viajes programados son las líneas de metro L5 (4.160), L1 (2.370), L3 (2.284), L4 (2.173) y L2 (2.078). El resto del top 20 lo completan las rutas `1.104.1` (1.865), `1.94.1` (1.856), `1.91.1` (1.796), `1.101.1` (1.782), `1.11.1` (1.413), `2.219.3070` (1.193), `2.24.2840` (1.174), `2.220.2999` (1.090), `2.22.3082` (1.077), `2.229.3024` (863), `2.212.2997` (840), `2.214.3012` (804), `2.208.3476` (794), `2.211.3019` (743) y `2.210.3078` (720).
+
+### Calidad e integridad de datos
+
+No se encontraron filas completamente duplicadas en ninguno de los seis datasets. Tampoco hay paradas sin coordenadas ni referencias rotas en las relaciones principales:
+
+| Comprobación | Registros no válidos |
+| --- | ---: |
+| `trips.route_id` sin ruta existente | 0 |
+| `stop_times.stop_id` sin parada existente | 0 |
+| `stop_times.trip_id` sin viaje existente | 0 |
+| Paradas sin latitud o longitud | 0 |
+
+Los nulos se concentran en campos opcionales o en horarios parciales:
+
+| Dataset | Campo | Nulos | Interpretación |
+| --- | --- | ---: | --- |
+| `stops` | `stop_url` | 3.445 | Campo opcional no informado. |
+| `stops` | `parent_station` | 2.776 | Solo aplica cuando la parada depende de una estación. |
+| `stops` | `wheelchair_boarding` | 139 | Accesibilidad no informada. |
+| `stop_times` | `arrival_time` | 764.691 | Horario no publicado en esa parada. |
+| `stop_times` | `departure_time` | 764.691 | Horario no publicado en esa parada. |
+
+Los horarios ausentes no se imputan: GTFS permite que se interpolen a partir de las paradas con hora publicada cuando el caso de uso lo requiera.
+
+### Transformaciones aplicadas
+
+El pipeline conserva los datos Raw y trabaja sobre una copia. Aplica limpieza de nombres de columna y texto, convierte coordenadas y `stop_sequence` a tipo numérico, elimina duplicados, evita `stop_id` repetidos y descarta filas sin identificadores o sin coordenadas.
+
+Además, después de eliminar espacios, las cadenas vacías se normalizan a `NA`. Esto permite que la regla de eliminación de identificadores las detecte correctamente. En la extracción analizada no se encontraron identificadores vacíos tras esa normalización y ninguna transformación eliminó registros.
+
+| Dataset | Registros iniciales | Registros finales | Eliminados |
+| --- | ---: | ---: | ---: |
+| `agency` | 1 | 1 | 0 |
+| `routes` | 116 | 116 | 0 |
+| `trips` | 60.537 | 60.537 | 0 |
+| `stops` | 3.445 | 3.445 | 0 |
+| `stop_times` | 1.391.617 | 1.391.617 | 0 |
+| `calendar` | 4 | 4 | 0 |
+
+En conjunto, el feed está listo para la siguiente etapa de procesamiento. Los controles de transformación quedan como salvaguarda ante futuras descargas con valores vacíos, tipos no normalizados o duplicados.
+
+---
+
 ## 📄 Licencia
 
 Este proyecto se desarrolla con fines educativos y de portfolio.
