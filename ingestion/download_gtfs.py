@@ -6,13 +6,11 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
+from utils.config import TMB_RAW_DIR
+
 TMB_BASE_URL = "https://api.tmb.cat/v1/static/datasets/gtfs.zip"
 TMB_APP_ID = os.getenv("TMB_APP_ID")
 TMB_APP_KEY = os.getenv("TMB_APP_KEY")
-
-BASE_DIR = Path("/app")
-DATA_DIR = BASE_DIR / "data" / "raw" / "tmb"
-LOG_DIR = BASE_DIR / "logs"
 
 # Validacion de configuracion TMB y lanzamos Raise
 if not TMB_APP_ID:
@@ -21,15 +19,7 @@ if not TMB_APP_ID:
 if not TMB_APP_KEY:
     raise ValueError("La variable TMB_APP_KEY no está configurada.")
 
-# Validacion de directorios si no estan creados
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-# Configuración de logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+TMB_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger(__name__) # aqui se guardan los logs de la app.
 
@@ -41,7 +31,7 @@ def download_gtfs() -> Path:
 
     date = datetime.now().strftime("%Y-%m-%d")
 
-    output_dir = DATA_DIR / date
+    output_dir = TMB_RAW_DIR / date
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / "tmb_gtfs.zip"
