@@ -1,1 +1,11 @@
 requests
+pandas
+matplotlib
+plotly
+nbformat
+pyspark
+sqlalchemy
+psycopg2-binary
+boto3
+gtfs-realtime-bindings
+kafka-python
