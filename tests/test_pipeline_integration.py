@@ -1312,3 +1312,358 @@ def test_pipeline_fails_when_calendar_file_is_missing(
         transform_gtfs.load_gtfs(
             gtfs_path
         )
+def test_get_latest_gtfs_returns_extracted_directory(tmp_path, monkeypatch):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+
+    snapshot = raw_directory / "2026-09-11"
+    snapshot.mkdir()
+    extracted = snapshot / "extracted"
+    extracted.mkdir()
+
+    monkeypatch.setattr(transform_gtfs, "TMB_RAW_DIR", raw_directory)
+
+    result = transform_gtfs.get_latest_gtfs()
+
+    assert result == extracted
+
+
+def test_get_latest_gtfs_selects_latest_snapshot(tmp_path, monkeypatch):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+
+    older = raw_directory / "2026-09-10"
+    latest = raw_directory / "2026-09-11"
+
+    older.mkdir()
+    latest.mkdir()
+
+    (older / "extracted").mkdir()
+    (latest / "extracted").mkdir()
+
+    monkeypatch.setattr(transform_gtfs, "TMB_RAW_DIR", raw_directory)
+
+    result = transform_gtfs.get_latest_gtfs()
+
+    assert result == latest / "extracted"
+
+
+def test_get_latest_gtfs_ignores_directory_without_extracted(
+    tmp_path,
+    monkeypatch,
+):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+
+    invalid_snapshot = raw_directory / "2026-09-12"
+    valid_snapshot = raw_directory / "2026-09-11"
+
+    invalid_snapshot.mkdir()
+    valid_snapshot.mkdir()
+
+    (valid_snapshot / "extracted").mkdir()
+
+    monkeypatch.setattr(transform_gtfs, "TMB_RAW_DIR", raw_directory)
+
+    result = transform_gtfs.get_latest_gtfs()
+
+    assert result == valid_snapshot / "extracted"
+
+
+def test_get_latest_gtfs_ignores_files(tmp_path, monkeypatch):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+
+    snapshot = raw_directory / "2026-09-11"
+    snapshot.mkdir()
+    (snapshot / "extracted").mkdir()
+
+    random_file = raw_directory / "archivo.txt"
+    random_file.write_text("datos")
+
+    monkeypatch.setattr(transform_gtfs, "TMB_RAW_DIR", raw_directory)
+
+    result = transform_gtfs.get_latest_gtfs()
+
+    assert result == snapshot / "extracted"
+
+
+def test_get_latest_gtfs_raises_when_no_gtfs_exists(
+    tmp_path,
+    monkeypatch,
+):
+    raw_directory = tmp_path / "raw"
+    raw_directory.mkdir()
+
+    monkeypatch.setattr(transform_gtfs, "TMB_RAW_DIR", raw_directory)
+
+    with pytest.raises(FileNotFoundError):
+        transform_gtfs.get_latest_gtfs()
+def test_load_gtfs_returns_expected_datasets(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    result = transform_gtfs.load_gtfs(gtfs_path)
+
+    expected_datasets = {
+        "agency",
+        "routes",
+        "trips",
+        "stops",
+        "stop_times",
+        "calendar",
+    }
+
+    assert set(result.keys()) == expected_datasets
+
+
+def test_load_gtfs_loads_all_datasets(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    result = transform_gtfs.load_gtfs(gtfs_path)
+
+    for dataframe in result.values():
+        assert isinstance(dataframe, pd.DataFrame)
+        assert not dataframe.empty
+
+
+def test_load_gtfs_preserves_expected_columns(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    result = transform_gtfs.load_gtfs(gtfs_path)
+
+    assert "agency_id" in result["agency"].columns
+    assert "route_id" in result["routes"].columns
+    assert "trip_id" in result["trips"].columns
+    assert "stop_id" in result["stops"].columns
+    assert "trip_id" in result["stop_times"].columns
+    assert "service_id" in result["calendar"].columns
+
+
+def test_load_gtfs_loads_values_as_strings(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    result = transform_gtfs.load_gtfs(gtfs_path)
+
+    assert isinstance(result["agency"]["agency_id"].iloc[0], str)
+    assert isinstance(result["routes"]["route_id"].iloc[0], str)
+    assert isinstance(result["trips"]["trip_id"].iloc[0], str)
+    assert isinstance(result["stops"]["stop_id"].iloc[0], str)
+
+def test_load_gtfs_logs_each_dataset(tmp_path, caplog):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    caplog.set_level(logging.INFO)
+
+    transform_gtfs.load_gtfs(gtfs_path)
+
+    assert "agency.txt cargado correctamente" in caplog.text
+    assert "routes.txt cargado correctamente" in caplog.text
+    assert "trips.txt cargado correctamente" in caplog.text
+    assert "stops.txt cargado correctamente" in caplog.text
+    assert "stop_times.txt cargado correctamente" in caplog.text
+    assert "calendar.txt cargado correctamente" in caplog.text
+
+
+def test_load_gtfs_raises_when_file_is_missing(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    (gtfs_path / "stops.txt").unlink()
+
+    with pytest.raises(FileNotFoundError):
+        transform_gtfs.load_gtfs(gtfs_path)
+
+
+def test_load_gtfs_does_not_modify_files(tmp_path):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    original_content = (gtfs_path / "routes.txt").read_text()
+
+    transform_gtfs.load_gtfs(gtfs_path)
+
+    new_content = (gtfs_path / "routes.txt").read_text()
+
+    assert new_content == original_content
+
+def test_save_processed_data_creates_date_directory(
+    tmp_path,
+    monkeypatch,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    assert output_directory.exists()
+    assert output_directory.is_dir()
+
+
+def test_save_processed_data_creates_all_csv_files(
+    tmp_path,
+    monkeypatch,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    date_directories = [
+        directory
+        for directory in output_directory.iterdir()
+        if directory.is_dir()
+    ]
+
+    assert len(date_directories) == 1
+
+    saved_directory = date_directories[0]
+
+    expected_files = {
+        "agency.csv",
+        "routes.csv",
+        "trips.csv",
+        "stops.csv",
+        "stop_times.csv",
+        "calendar.csv",
+    }
+
+    saved_files = {
+        file.name
+        for file in saved_directory.iterdir()
+    }
+
+    assert saved_files == expected_files
+
+
+def test_save_processed_data_preserves_row_counts(
+    tmp_path,
+    monkeypatch,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    saved_directory = next(output_directory.iterdir())
+
+    for name, dataframe in transformed.items():
+        saved_dataframe = pd.read_csv(
+            saved_directory / f"{name}.csv"
+        )
+
+        assert len(saved_dataframe) == len(dataframe)
+
+
+def test_save_processed_data_preserves_columns(
+    tmp_path,
+    monkeypatch,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    saved_directory = next(output_directory.iterdir())
+
+    for name, dataframe in transformed.items():
+        saved_dataframe = pd.read_csv(
+            saved_directory / f"{name}.csv"
+        )
+
+        assert list(saved_dataframe.columns) == list(
+            dataframe.columns
+        )
+
+
+def test_save_processed_data_files_can_be_reloaded(
+    tmp_path,
+    monkeypatch,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    saved_directory = next(output_directory.iterdir())
+
+    for name in transformed:
+        saved_file = saved_directory / f"{name}.csv"
+
+        assert saved_file.exists()
+
+        dataframe = pd.read_csv(saved_file)
+
+        assert isinstance(dataframe, pd.DataFrame)
+
+
+def test_save_processed_data_logs_destination(
+    tmp_path,
+    monkeypatch,
+    caplog,
+):
+    gtfs_path = create_integration_gtfs(tmp_path)
+
+    data = transform_gtfs.load_gtfs(gtfs_path)
+    transformed = transform_gtfs.transform_gtfs(data)
+
+    output_directory = tmp_path / "processed"
+
+    monkeypatch.setattr(
+        transform_gtfs,
+        "TMB_PROCESSED_DIR",
+        output_directory,
+    )
+
+    caplog.set_level(logging.INFO)
+
+    transform_gtfs.save_processed_data(transformed, "2026-09-11")
+
+    assert "guardado:" in caplog.text
