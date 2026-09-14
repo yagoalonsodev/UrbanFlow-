@@ -52,10 +52,19 @@ with DAG(
         ),
     )
 
+    load_dimensional = BashOperator(
+        task_id="load_dimensional",
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/load_dimensional.py"
+        ),
+    )
+
     (
         download_gtfs
         >> validate_data
         >> transform_gtfs
         >> upload_minio
         >> load_postgres
+        >> load_dimensional
     )
