@@ -1,0 +1,1 @@
+"""Agente LangGraph de consulta segura para UrbanFlow."""

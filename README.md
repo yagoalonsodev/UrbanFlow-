@@ -1093,6 +1093,41 @@ El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos 
 
 ---
 
+# 🤖 Agente LangGraph
+
+UrbanFlow incluye un agente LangGraph en `agent/graph.py` para consultar el estado histórico y realtime de PostgreSQL.
+
+El grafo usa:
+
+- Ollama local, configurable con `OLLAMA_MODEL`.
+- Persistencia nativa de LangGraph Dev por `thread_id`.
+- Contexto vivo del esquema, snapshot más reciente y volumen realtime en cada ejecución.
+- Herramienta SQL de solo lectura sobre las tablas reales de UrbanFlow.
+- Guardrails contra escritura SQL, múltiples sentencias, comentarios y tablas inexistentes.
+
+## Arrancar LangGraph Dev
+
+Primero inicia Ollama y descarga el modelo elegido:
+
+```bash
+ollama serve
+ollama pull llama3.2
+```
+
+En otra terminal, desde la raíz del proyecto:
+
+```bash
+export OLLAMA_MODEL=llama3.2
+export AGENT_DATABASE_URL=postgresql+psycopg2://urbanflow:urbanflow123@localhost:5432/urbanflow
+.venv/bin/langgraph dev --host 127.0.0.1 --port 2024
+```
+
+Después estarán disponibles la API en `http://127.0.0.1:2024` y la documentación en `http://127.0.0.1:2024/docs`.
+
+Cada conversación debe usar un `thread_id` estable para conservar el historial. El agente solo puede fundamentar respuestas en el contexto recibido o en resultados de consultas PostgreSQL permitidas.
+
+---
+
 # 📌 Estado y roadmap
 
 El estado actual incluye ingestion GTFS, transformación Spark a Parquet, validaciones de calidad, carga en MinIO y PostgreSQL, modelo dimensional, streaming GTFS-RT estable, alertas, errores, métricas realtime, dashboard Metabase, CI, Ruff y Mypy.

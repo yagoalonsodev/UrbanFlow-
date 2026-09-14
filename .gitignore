@@ -14,3 +14,5 @@ logs/
 
 .ipynb_checkpoints/
 reglas.txt
+*.sqlite
+.langgraph_api/
