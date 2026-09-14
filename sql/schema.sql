@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS routes (
 
     route_type INTEGER,
 
-    route_url VARCHAR(500
+    route_url VARCHAR(500),
 
     route_color VARCHAR(20),
 
@@ -277,7 +277,7 @@ CREATE INDEX IF NOT EXISTS idx_stops_snapshot_date
 
     ON stops(snapshot_date);
 
-CREATE INDEX IF NOT EISTS idx_calendar_snapshot_date
+CREATE INDEX IF NOT EXISTS idx_calendar_snapshot_date
 
     ON calendar(snapshot_date);
 
