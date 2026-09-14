@@ -152,7 +152,7 @@ Procesa eventos de transporte prácticamente en tiempo real.
 
                     │                  │
 
-                    │ transport-events │
+                    │  gtfs-realtime   │
 
                     └────────┬─────────┘
 
@@ -198,36 +198,23 @@ Procesa eventos de transporte prácticamente en tiempo real.
 
 # ⚡ Procesamiento en tiempo real
 
-Uno de los principales objetivos de UrbanFlow es implementar un pipeline de procesamiento de eventos en tiempo real.
+UrbanFlow implementa un pipeline de llegadas GTFS-RT en tiempo real mediante la API de TMB.
 
-El sistema recibe continuamente eventos representando el estado de vehículos de transporte.
+El productor consulta la API de TMB y publica eventos normalizados de llegadas de autobuses.
 
 Ejemplo de evento:
 
 ```json
-
 {
-
-  "event_id": "evt_982341",
-
-  "vehicle_id": "BUS_1842",
-
-  "line_id": "H12",
-
-  "station_id": "ST_032",
-
-  "timestamp": "2026-09-10T17:45:32",
-
-  "latitude": 41.3874,
-
-  "longitude": 2.1686,
-
-  "delay_seconds": 127,
-
-  "occupancy": 0.82
-
+  "timestamp": 1789387200,
+  "destination": "Centre",
+  "line": "H12",
+  "route_id": "2.12.123",
+  "stop": "1234",
+  "time_in_minutes": 4,
+  "time_in_seconds": 240,
+  "text_ca": "4 min"
 }
-
 ```
 
 El evento sigue el siguiente recorrido:
@@ -294,7 +281,7 @@ De esta forma, el pipeline puede probarse completamente de manera local.
 
 # 🚌 Modelo de datos
 
-Cada evento representa el estado de un vehículo en un momento determinado.
+Los eventos streaming representan llegadas estimadas de autobuses de TMB.
 
 Los principales atributos son:
 
@@ -302,23 +289,21 @@ Los principales atributos son:
 
 |---|---|
 
-| `event_id` | Identificador único del evento |
+| `timestamp` | Timestamp Unix del evento |
 
-| `vehicle_id` | Identificador del vehículo |
+| `destination` | Destino anunciado |
 
-| `line_id` | Línea de transporte |
+| `line` | Línea de transporte |
 
-| `station_id` | Estación o parada |
+| `route_id` | Identificador de ruta GTFS |
 
-| `timestamp` | Fecha y hora del evento |
+| `stop` | Identificador de parada recibido de TMB |
 
-| `latitude` | Latitud |
+| `time_in_minutes` | Minutos estimados hasta la llegada |
 
-| `longitude` | Longitud |
+| `time_in_seconds` | Segundos estimados hasta la llegada |
 
-| `delay_seconds` | Retraso en segundos |
-
-| `occupancy` | Nivel de ocupación |
+| `text_ca` | Texto original de llegada |
 
 ---
 
@@ -328,9 +313,9 @@ Kafka se utiliza como plataforma de transmisión de eventos.
 
 ## Topics principales
 
-### `transport-events`
+### `gtfs-realtime`
 
-Topic principal donde se publican los eventos de transporte.
+Topic principal donde se publican las llegadas de autobuses normalizadas desde TMB.
 
 ```text
 
@@ -340,7 +325,7 @@ Python Producer
 
       ▼
 
-transport-events
+gtfs-realtime
 
       │
 
@@ -358,17 +343,11 @@ Por ejemplo:
 
 ```text
 
-delay_seconds > 600
+time_in_seconds > 600
 
 ```
 
-o:
-
-```text
-
-occupancy > 0.95
-
-```
+Los eventos rechazados se publican en `transport-errors` con el motivo y el evento original.
 
 ### `transport-errors`
 
@@ -424,35 +403,17 @@ Entre las métricas calculadas se encuentran:
 
 UrbanFlow incorpora reglas para detectar situaciones anómalas.
 
-## Retraso crítico
+## Espera de llegada crítica
 
 ```text
 
-delay_seconds > 600
+time_in_seconds > 600
 
 ```
 
-Genera una alerta de retraso crítico.
+Genera una alerta `critical_arrival_wait` de severidad `critical`.
 
-## Vehículo saturado
-
-```text
-
-occupancy > 0.95
-
-```
-
-Genera una alerta de ocupación elevada.
-
-## Retraso anómalo
-
-```text
-
-delay_seconds > historical_average * 2
-
-```
-
-Permite detectar retrasos significativamente superiores al comportamiento habitual.
+Las reglas de ocupación y retraso histórico quedan fuera del contrato actual porque el productor de TMB no proporciona esos campos.
 
 Las alertas se envían a:
 
@@ -520,35 +481,17 @@ La plataforma incorpora diferentes controles de calidad.
 
 ```text
 
-event_id no puede ser NULL
-
-event_id debe ser único
+timestamp, line, route_id y stop son obligatorios
 
 ```
 
-### Coordenadas
+### Tiempos de llegada
 
 ```text
 
--90 <= latitude <= 90
+time_in_minutes >= 0
 
--180 <= longitude <= 180
-
-```
-
-### Ocupación
-
-```text
-
-0 <= occupancy <= 1
-
-```
-
-### Retraso
-
-```text
-
-delay_seconds >= 0
+time_in_seconds >= 0
 
 ```
 
@@ -566,55 +509,29 @@ UrbanFlow utiliza un **Star Schema**.
 
 ```text
 
-                         ┌───────────────┐
-
-                         │   dim_date    │
-
-                         └───────┬───────┘
-
-                                 │
-
-                                 │
-
-┌───────────────┐        ┌───────▼────────┐       ┌────────────────┐
-
-│ dim_vehicle   │───────►│ fact_transport │◄──────│  dim_station   │
-
-└───────────────┘        └───────┬────────┘       └────────────────┘
-
-                                 │
-
-                     ┌───────────┴───────────┐
-
-                     │                       │
-
-              ┌──────▼──────┐        ┌──────▼──────┐
-
-              │   dim_time  │        │   dim_line  │
-
-              └─────────────┘        └─────────────┘
+                  dim_route       dim_service       dim_stop
+                      \              |              /
+                       \             |             /
+                        └──────── fact_trip ──────┘
+                                    |
+                              fact_stop_time
 
 ```
 
 ## Dimensiones
 
-- `dim_date`
+- `dim_route`
+- `dim_stop`
+- `dim_service`
 
-- `dim_time`
+## Tablas de hechos
 
-- `dim_vehicle`
+- `fact_trip`
+- `fact_stop_time`
 
-- `dim_station`
+El grain de `fact_trip` es un registro por viaje y snapshot. El grain de `fact_stop_time` es un registro por parada de un viaje y snapshot.
 
-- `dim_line`
-
-## Tabla de hechos
-
-- `fact_transport_events`
-
-La granularidad de la tabla de hechos será:
-
-> Una fila representa un evento correspondiente al estado de un vehículo en un instante determinado.
+Las tablas dimensionales usan surrogate keys y las facts se relacionan mediante `route_key`, `service_key`, `trip_key` y `stop_key`.
 
 ---
 
@@ -622,67 +539,59 @@ La granularidad de la tabla de hechos será:
 
 El Data Warehouse permitirá realizar consultas analíticas como:
 
-### Retraso medio por línea
+### Viajes por tipo de transporte
 
 ```sql
 
 SELECT
 
-    l.line_name,
+      r.route_type,
+      COUNT(f.trip_key) AS total_viajes
 
-    AVG(f.delay_seconds) AS avg_delay
+FROM fact_trip f
 
-FROM fact_transport_events f
+JOIN dim_route r ON f.route_key = r.route_key
 
-JOIN dim_line l
-
-    ON f.line_id = l.line_id
-
-GROUP BY l.line_name
-
-ORDER BY avg_delay DESC;
+GROUP BY r.route_type
+ORDER BY total_viajes DESC;
 
 ```
 
-### Ocupación media
+### Top de rutas por viajes
 
 ```sql
 
 SELECT
 
-    l.line_name,
+      r.route_short_name,
+      COUNT(f.trip_key) AS total_viajes
 
-    AVG(f.occupancy) AS avg_occupancy
+FROM fact_trip f
 
-FROM fact_transport_events f
+JOIN dim_route r ON f.route_key = r.route_key
 
-JOIN dim_line l
-
-    ON f.line_id = l.line_id
-
-GROUP BY l.line_name;
+GROUP BY r.route_key, r.route_short_name
+ORDER BY total_viajes DESC
+LIMIT 10;
 
 ```
 
-### Evolución temporal del retraso
+### Top de paradas por pasos de viajes
 
 ```sql
 
 SELECT
 
-    [d.date](http://d.date),
+      s.stop_name,
+      COUNT(*) AS total_pasos
 
-    AVG(f.delay_seconds) AS avg_delay
+FROM fact_stop_time f
 
-FROM fact_transport_events f
+JOIN dim_stop s ON f.stop_key = s.stop_key
 
-JOIN dim_date d
-
-    ON [f.date](http://f.date)_id = [d.date](http://d.date)_id
-
-GROUP BY [d.date](http://d.date)
-
-ORDER BY [d.date](http://d.date);
+GROUP BY s.stop_key, s.stop_name
+ORDER BY total_pasos DESC
+LIMIT 10;
 
 ```
 
@@ -692,11 +601,11 @@ ORDER BY [d.date](http://d.date);
 
 Airflow será utilizado para la orquestación de los procesos batch.
 
-El DAG principal tendrá una estructura similar a:
+El DAG implementado se llama `urbanflow_batch` y ejecuta:
 
 ```text
 
-extract_data
+download_gtfs
 
       ↓
 
@@ -704,11 +613,7 @@ validate_data
 
       ↓
 
-store_raw_data
-
-      ↓
-
-spark_transform
+transform_gtfs
 
       ↓
 
@@ -716,17 +621,25 @@ data_quality
 
       ↓
 
-load_warehouse
+validate_processed_snapshot
 
       ↓
 
-generate_metrics
+upload_minio
+
+      ↓
+
+load_postgres
+
+      ↓
+
+load_dimensional
 
 ```
 
-Airflow permitirá:
+Airflow proporciona:
 
-- Programar ejecuciones.
+- Lanzar manualmente el DAG (`schedule=None`).
 
 - Gestionar dependencias.
 
@@ -754,7 +667,7 @@ docker compose up -d
 
 ```
 
-Servicios previstos:
+Servicios disponibles:
 
 ```text
 
@@ -762,13 +675,19 @@ Servicios previstos:
 
 ├── kafka
 
-├── spark
+├── spark-streaming
 
 ├── postgres
 
 ├── minio
 
-├── airflow
+├── airflow-apiserver
+
+├── airflow-scheduler
+
+├── airflow-dag-processor
+
+├── airflow-triggerer
 
 └── metabase
 
@@ -782,41 +701,35 @@ Esto permite reproducir el entorno de desarrollo sin necesidad de instalar manua
 
 Los datos almacenados en el Data Warehouse serán utilizados para crear un dashboard de movilidad urbana.
 
-## UrbanFlow Mobility Analytics
+## UrbanFlow Barcelona — Public Transport Analytics
 
 Principales KPIs:
 
 ```text
 
-Vehículos activos
+Total de viajes
 
-Eventos procesados
+Total de rutas y paradas
 
-Retraso medio
+Viajes por tipo de transporte
 
-Ocupación media
+Top de rutas y paradas
 
-Alertas críticas
+Llegadas GTFS-RT registradas
 
 ```
 
-Visualizaciones previstas:
+Tarjetas disponibles en Metabase:
 
-- Retraso medio por línea.
-
-- Evolución del retraso.
-
-- Ocupación por línea.
-
-- Vehículos activos.
-
-- Eventos procesados por minuto.
-
-- Estaciones con mayor actividad.
-
-- Alertas generadas.
-
-- Distribución de retrasos.
+- Viajes por tipo de transporte.
+- Top 10 líneas por número de viajes.
+- Total de viajes.
+- Total de paradas.
+- Total de líneas.
+- Top 10 paradas.
+- Llegadas en tiempo real por línea.
+- Últimas llegadas en tiempo real.
+- Total de llegadas en tiempo real.
 
 ---
 
@@ -1046,119 +959,29 @@ La arquitectura local con MinIO permitirá trabajar con una aproximación compat
 
 urbanflow/
 
-│
-
-├── [README.md](http://README.md)
-
-│
-
-├── docs/
-
-│   ├── [architecture.md](http://architecture.md)
-
-│   ├── [data-model.md](http://data-model.md)
-
-│   └── [decisions.md](http://decisions.md)
-
-│
-
-├── architecture/
-
-│   ├── architecture.png
-
-│   └── star-schema.png
-
-│
-
-├── producer/
-
-│   ├── src/
-
-│   ├── tests/
-
-│   ├── Dockerfile
-
-│   └── requirements.txt
-
-│
-
+├── dags/urbanflow_batch.py
+├── ingestion/
+├── processing/
 ├── streaming/
-
-│   ├── src/
-
-│   ├── tests/
-
-│   └── Dockerfile
-
-│
-
-├── batch/
-
-│   ├── src/
-
-│   └── tests/
-
-│
-
-├── airflow/
-
-│   └── dags/
-
-│       └── urbanflow_[pipeline.py](http://pipeline.py)
-
-│
-
-├── spark/
-
-│   ├── streaming/
-
-│   └── batch/
-
-│
-
+├── utils/
 ├── sql/
-
-│   ├── ddl/
-
-│   ├── dimensions/
-
-│   ├── facts/
-
-│   └── analytics/
-
-│
-
-├── data/
-
-│   └── sample/
-
-│
-
+│   ├── schema.sql
+│   ├── dimensional_schema.sql
+│   ├── analytics.sql
+│   ├── dimensional_analytics.sql
+│   └── metabase_dashboard.sql
 ├── tests/
-
-│
-
-├── dashboard/
-
-│
-
+├── notebooks/gtfs_analysis.ipynb
+├── data/raw/tmb/
+├── data/processed/tmb/
 ├── docker-compose.yml
-
 ├── Dockerfile
-
+├── airflow/Dockerfile
+├── streaming/Dockerfile.producer
+├── streaming/Dockerfile.spark
 ├── requirements.txt
-
-├── .env.example
-
-├── .gitignore
-
-│
-
-└── .github/
-
-    └── workflows/
-
-        └── ci.yml
+├── pytest.ini
+└── .github/workflows/ci.yml
 
 ```
 
@@ -1196,11 +1019,11 @@ cd urbanflow
 
 ```bash
 
-cp .env.example .env
+touch .env
 
 ```
 
-Configurar las variables necesarias en `.env`.
+Configurar en `.env` las credenciales de TMB, PostgreSQL, MinIO y las variables de conexión usadas por Docker Compose.
 
 ## 3. Iniciar los servicios
 
@@ -1270,7 +1093,9 @@ El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos 
 
 ---
 
-# 📌 Roadmap
+# 📌 Estado y roadmap
+
+El estado actual incluye ingestion GTFS, transformación Spark a Parquet, validaciones de calidad, carga en MinIO y PostgreSQL, modelo dimensional, streaming GTFS-RT, alertas, errores, dashboard Metabase y CI básico.
 
 ## Fase 1 — Preparación
 
@@ -1284,39 +1109,39 @@ El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos 
 
 ## Fase 2 — Ingestion
 
-- [ ] Implementar Producer Python.
+- [x] Implementar Producer Python.
 
-- [ ] Integrar API/GTFS.
+- [x] Integrar API/GTFS.
 
 - [ ] Crear generador de eventos.
 
-- [ ] Implementar validación inicial.
+- [x] Implementar validación inicial.
 
 - [ ] Añadir logging.
 
 ## Fase 3 — Kafka
 
-- [ ] Configurar Kafka.
+- [x] Configurar Kafka.
 
 - [ ] Crear topics.
 
-- [ ] Implementar Producer.
+- [x] Implementar Producer.
 
 - [ ] Implementar Consumer.
 
 - [ ] Configurar Consumer Groups.
 
-- [ ] Gestionar errores.
+- [x] Gestionar errores.
 
 ## Fase 4 — Streaming
 
-- [ ] Configurar Spark.
+- [x] Configurar Spark.
 
-- [ ] Implementar Structured Streaming.
+- [x] Implementar Structured Streaming.
 
-- [ ] Consumir eventos Kafka.
+- [x] Consumir eventos Kafka.
 
-- [ ] Transformar eventos.
+- [x] Transformar eventos.
 
 - [ ] Calcular métricas.
 
@@ -1324,95 +1149,95 @@ El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos 
 
 ## Fase 5 — Data Lake
 
-- [ ] Configurar MinIO.
+- [x] Configurar MinIO.
 
-- [ ] Crear Raw Zone.
+- [x] Crear Raw Zone.
 
-- [ ] Crear Processed Zone.
+- [x] Crear Processed Zone.
 
 - [ ] Crear Curated Zone.
 
-- [ ] Implementar almacenamiento Parquet.
+- [x] Implementar almacenamiento Parquet.
 
-- [ ] Particionar datos por fecha.
+- [x] Particionar datos por fecha.
 
 ## Fase 6 — Data Warehouse
 
-- [ ] Diseñar modelo dimensional.
+- [x] Diseñar modelo dimensional.
 
-- [ ] Crear dimensiones.
+- [x] Crear dimensiones.
 
-- [ ] Crear tabla de hechos.
+- [x] Crear tablas de hechos.
 
-- [ ] Implementar procesos de carga.
+- [x] Implementar procesos de carga.
 
-- [ ] Crear consultas analíticas.
+- [x] Crear consultas analíticas.
 
 - [ ] Optimizar consultas.
 
 ## Fase 7 — Data Quality
 
-- [ ] Implementar validaciones.
+- [x] Implementar validaciones.
 
-- [ ] Detectar duplicados.
+- [x] Detectar duplicados.
 
-- [ ] Detectar valores NULL.
+- [x] Detectar valores NULL.
 
-- [ ] Validar rangos.
+- [x] Validar rangos.
 
-- [ ] Crear informes de calidad.
+- [x] Crear informes de calidad.
 
-- [ ] Gestionar datos rechazados.
+- [x] Gestionar datos rechazados.
 
 ## Fase 8 — Airflow
 
 - [ ] Configurar Airflow.
 
-- [ ] Crear DAG.
+- [x] Crear DAG.
 
-- [ ] Automatizar ingestion.
+- [x] Automatizar ingestion.
 
-- [ ] Automatizar transformaciones.
+- [x] Automatizar transformaciones.
 
-- [ ] Automatizar data quality.
+- [x] Automatizar data quality.
 
-- [ ] Automatizar carga del DWH.
+- [x] Automatizar carga del DWH.
 
 ## Fase 9 — Analytics
 
-- [ ] Configurar Metabase.
+- [x] Configurar Metabase.
 
-- [ ] Crear KPIs.
+- [x] Crear KPIs.
 
-- [ ] Crear gráficos.
+- [x] Crear gráficos.
 
-- [ ] Crear dashboard.
+- [x] Crear dashboard.
 
 - [ ] Analizar tendencias.
 
 ## Fase 10 — Testing
 
-- [ ] Tests unitarios.
+- [x] Tests unitarios.
 
-- [ ] Tests de integración.
+- [x] Tests de integración.
 
-- [ ] Tests de calidad de datos.
+- [x] Tests de calidad de datos.
 
-- [ ] Tests del Producer.
+- [x] Tests del Producer.
 
-- [ ] Tests del procesamiento.
+- [x] Tests del procesamiento.
 
 ## Fase 11 — CI/CD
 
-- [ ] GitHub Actions.
+- [x] GitHub Actions.
 
-- [ ] Ejecutar tests automáticamente.
+- [x] Ejecutar tests automáticamente.
 
 - [ ] Lint.
 
 - [ ] Type checking.
 
-- [ ] Docker build.
+- [x] Docker build.
 
 ## Fase 12 — Cloud
 
@@ -1516,24 +1341,24 @@ El análisis se realizó sobre la extracción `data/raw/tmb/2026-09-10/extracted
 
 ### Volumen del feed
 
-| Dataset | Registros | Columnas |
-| --- | ---: | ---: |
-| `agency` | 1 | 5 |
-| `routes` | 116 | 7 |
-| `trips` | 60.537 | 7 |
-| `stops` | 3.445 | 9 |
-| `stop_times` | 1.391.617 | 5 |
-| `calendar` | 4 | 10 |
+| Dataset      | Registros | Columnas |
+| ------------ | --------: | -------: |
+| `agency`     |         1 |        5 |
+| `routes`     |       116 |        7 |
+| `trips`      |    60.537 |        7 |
+| `stops`      |     3.445 |        9 |
+| `stop_times` | 1.391.617 |        5 |
+| `calendar`   |         4 |       10 |
 
 La agencia es TMB, con zona horaria `Europe/Madrid`. El calendario contiene cuatro servicios: dos laborables y dos de fin de semana, con vigencias entre el 9 de septiembre de 2026 y el 27 de marzo de 2027.
 
 ### Oferta de transporte y actividad programada
 
-| `route_type` | Medio | Rutas |
-| ---: | --- | ---: |
-| 3 | Autobús | 105 |
-| 1 | Metro | 10 |
-| 7 | Funicular/teleférico | 1 |
+| `route_type` | Medio                | Rutas |
+| -----------: | -------------------- | ----: |
+|            3 | Autobús              |   105 |
+|            1 | Metro                |    10 |
+|            7 | Funicular/teleférico |     1 |
 
 Las cinco rutas con más viajes programados son las líneas de metro L5 (4.160), L1 (2.370), L3 (2.284), L4 (2.173) y L2 (2.078). El resto del top 20 lo completan las rutas `1.104.1` (1.865), `1.94.1` (1.856), `1.91.1` (1.796), `1.101.1` (1.782), `1.11.1` (1.413), `2.219.3070` (1.193), `2.24.2840` (1.174), `2.220.2999` (1.090), `2.22.3082` (1.077), `2.229.3024` (863), `2.212.2997` (840), `2.214.3012` (804), `2.208.3476` (794), `2.211.3019` (743) y `2.210.3078` (720).
 
@@ -1541,22 +1366,22 @@ Las cinco rutas con más viajes programados son las líneas de metro L5 (4.160),
 
 No se encontraron filas completamente duplicadas en ninguno de los seis datasets. Tampoco hay paradas sin coordenadas ni referencias rotas en las relaciones principales:
 
-| Comprobación | Registros no válidos |
-| --- | ---: |
-| `trips.route_id` sin ruta existente | 0 |
-| `stop_times.stop_id` sin parada existente | 0 |
-| `stop_times.trip_id` sin viaje existente | 0 |
-| Paradas sin latitud o longitud | 0 |
+| Comprobación                              | Registros no válidos |
+| ----------------------------------------- | -------------------: |
+| `trips.route_id` sin ruta existente       |                    0 |
+| `stop_times.stop_id` sin parada existente |                    0 |
+| `stop_times.trip_id` sin viaje existente  |                    0 |
+| Paradas sin latitud o longitud            |                    0 |
 
 Los nulos se concentran en campos opcionales o en horarios parciales:
 
-| Dataset | Campo | Nulos | Interpretación |
-| --- | --- | ---: | --- |
-| `stops` | `stop_url` | 3.445 | Campo opcional no informado. |
-| `stops` | `parent_station` | 2.776 | Solo aplica cuando la parada depende de una estación. |
-| `stops` | `wheelchair_boarding` | 139 | Accesibilidad no informada. |
-| `stop_times` | `arrival_time` | 764.691 | Horario no publicado en esa parada. |
-| `stop_times` | `departure_time` | 764.691 | Horario no publicado en esa parada. |
+| Dataset      | Campo                 |   Nulos | Interpretación                                        |
+| ------------ | --------------------- | ------: | ----------------------------------------------------- |
+| `stops`      | `stop_url`            |   3.445 | Campo opcional no informado.                          |
+| `stops`      | `parent_station`      |   2.776 | Solo aplica cuando la parada depende de una estación. |
+| `stops`      | `wheelchair_boarding` |     139 | Accesibilidad no informada.                           |
+| `stop_times` | `arrival_time`        | 764.691 | Horario no publicado en esa parada.                   |
+| `stop_times` | `departure_time`      | 764.691 | Horario no publicado en esa parada.                   |
 
 Los horarios ausentes no se imputan: GTFS permite que se interpolen a partir de las paradas con hora publicada cuando el caso de uso lo requiera.
 
@@ -1566,14 +1391,14 @@ El pipeline conserva los datos Raw y trabaja sobre una copia. Aplica limpieza de
 
 Además, después de eliminar espacios, las cadenas vacías se normalizan a `NA`. Esto permite que la regla de eliminación de identificadores las detecte correctamente. En la extracción analizada no se encontraron identificadores vacíos tras esa normalización y ninguna transformación eliminó registros.
 
-| Dataset | Registros iniciales | Registros finales | Eliminados |
-| --- | ---: | ---: | ---: |
-| `agency` | 1 | 1 | 0 |
-| `routes` | 116 | 116 | 0 |
-| `trips` | 60.537 | 60.537 | 0 |
-| `stops` | 3.445 | 3.445 | 0 |
-| `stop_times` | 1.391.617 | 1.391.617 | 0 |
-| `calendar` | 4 | 4 | 0 |
+| Dataset      | Registros iniciales | Registros finales | Eliminados |
+| ------------ | ------------------: | ----------------: | ---------: |
+| `agency`     |                   1 |                 1 |          0 |
+| `routes`     |                 116 |               116 |          0 |
+| `trips`      |              60.537 |            60.537 |          0 |
+| `stops`      |               3.445 |             3.445 |          0 |
+| `stop_times` |           1.391.617 |         1.391.617 |          0 |
+| `calendar`   |                   4 |                 4 |          0 |
 
 En conjunto, el feed está listo para la siguiente etapa de procesamiento. Los controles de transformación quedan como salvaguarda ante futuras descargas con valores vacíos, tipos no normalizados o duplicados.
 
