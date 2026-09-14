@@ -10,4 +10,5 @@ boto3
 gtfs-realtime-bindings
 pytest
 kafka-python
-pytest
+python-dotenv
+minio

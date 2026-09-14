@@ -1,0 +1,16 @@
+FROM spark:4.2.0-python3
+
+USER root
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    pyspark==4.2.0 \
+    kafka-python \
+    psycopg2-binary \
+    python-dotenv
+
+COPY streaming ./streaming
+COPY utils ./utils
+
+CMD ["python3", "-m", "streaming.spark_streaming"]
