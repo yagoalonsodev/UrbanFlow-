@@ -9,11 +9,13 @@ from utils.constants import (
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_TOPIC_GTFS_REALTIME,
     KAFKA_TOPIC_TRANSPORT_ALERTS,
+    KAFKA_TOPIC_TRANSPORT_ERRORS,
     STREAMING_INTERVAL_SECONDS,
     TMB_REALTIME_URL,
 )
 from streaming.alerts import build_arrival_alert
 from streaming.event_validation import validate_realtime_event
+from streaming.errors import build_validation_error_event
 
 
 def create_producer():
@@ -71,6 +73,7 @@ def main():
                 messages_sent = 0
                 messages_rejected = 0
                 alerts_sent = 0
+                errors_sent = 0
 
                 for bus in ibus:
                     message = {
@@ -88,6 +91,14 @@ def main():
                         validate_realtime_event(message)
                     except ValueError as error:
                         messages_rejected += 1
+                        producer.send(
+                            KAFKA_TOPIC_TRANSPORT_ERRORS,
+                            value=build_validation_error_event(
+                                message,
+                                str(error),
+                            ),
+                        )
+                        errors_sent += 1
                         print(f"Evento GTFS-RT rechazado: {error}")
                         continue
 
@@ -112,6 +123,7 @@ def main():
                     f"Mensajes rechazados por validación: {messages_rejected}"
                 )
                 print(f"Alertas enviadas a Kafka: {alerts_sent}")
+                print(f"Errores enviados a Kafka: {errors_sent}")
 
             except requests.RequestException as error:
                 print(f"Error API TMB: {error}")

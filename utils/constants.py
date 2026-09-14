@@ -15,6 +15,7 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv(
 
 KAFKA_TOPIC_GTFS_REALTIME = "gtfs-realtime"
 KAFKA_TOPIC_TRANSPORT_ALERTS = "transport-alerts"
+KAFKA_TOPIC_TRANSPORT_ERRORS = "transport-errors"
 
 
 # PostgreSQL
