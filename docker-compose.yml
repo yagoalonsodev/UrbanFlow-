@@ -316,6 +316,69 @@ services:
     ports:
       - "3000:3000"
 
+  # =========================================================
+  # LANGGRAPH + OLLAMA (OPTIONAL PROFILE)
+  # =========================================================
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: urbanflow-ollama
+    profiles:
+      - agent
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: urbanflow-ollama-init
+    profiles:
+      - agent
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-deepseek-coder:6.7b}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull $${OLLAMA_MODEL}"]
+
+  urbanflow-agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    container_name: urbanflow-agent
+    profiles:
+      - agent
+    restart: unless-stopped
+    environment:
+      AGENT_DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-deepseek-coder:6.7b}
+      LANGGRAPH_PORT: 2024
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    ports:
+      - "2024:2024"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:2024/ok')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    command: ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024"]
+
 
 # ===========================================================
 # VOLUMES
@@ -327,3 +390,4 @@ volumes:
   airflow_postgres_data:
   metabase_postgres_data:
   spark_checkpoint:
+  ollama_data:

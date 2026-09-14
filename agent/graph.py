@@ -43,6 +43,7 @@ def context_node(state: AgentState) -> dict[str, list[SystemMessage]]:
 def assistant_node(state: AgentState) -> dict[str, list[BaseMessage]]:
     model = ChatOllama(
         model=os.getenv("OLLAMA_MODEL", "llama3.2"),
+        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
         temperature=0,
     ).bind_tools(tools)
     system = SystemMessage(

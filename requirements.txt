@@ -16,3 +16,4 @@ ruff
 mypy
 langgraph
 langchain-ollama
+langgraph-cli[inmem]

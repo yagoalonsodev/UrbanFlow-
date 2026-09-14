@@ -1126,6 +1126,29 @@ Después estarán disponibles la API en `http://127.0.0.1:2024` y la documentaci
 
 Cada conversación debe usar un `thread_id` estable para conservar el historial. El agente solo puede fundamentar respuestas en el contexto recibido o en resultados de consultas PostgreSQL permitidas.
 
+## Ejecutar el agente dentro de Docker
+
+El agente y Ollama están definidos en el perfil opcional `agent`. No se inician con el `docker compose up` normal.
+
+Para usar DeepSeek Coder dentro de Docker:
+
+```bash
+export OLLAMA_MODEL=deepseek-coder:6.7b
+docker compose --profile agent up -d ollama ollama-init urbanflow-agent
+```
+
+La primera ejecución puede tardar porque descarga el modelo. Las siguientes reutilizan el volumen `ollama_data`. La API queda disponible desde fuera en:
+
+```text
+http://localhost:2024
+```
+
+Para detener solo el agente:
+
+```bash
+docker compose --profile agent stop urbanflow-agent ollama ollama-init
+```
+
 ---
 
 # 📌 Estado y roadmap
