@@ -115,6 +115,10 @@ def main():
             "startingOffsets",
             "latest",
         )
+        .option(
+            "failOnDataLoss",
+            "false",
+        )
         .load()
     )
 
