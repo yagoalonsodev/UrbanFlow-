@@ -8,9 +8,11 @@ from utils.config import TMB_APP_ID, TMB_APP_KEY
 from utils.constants import (
     KAFKA_BOOTSTRAP_SERVERS,
     KAFKA_TOPIC_GTFS_REALTIME,
+    KAFKA_TOPIC_TRANSPORT_ALERTS,
     STREAMING_INTERVAL_SECONDS,
     TMB_REALTIME_URL,
 )
+from streaming.alerts import build_arrival_alert
 from streaming.event_validation import validate_realtime_event
 
 
@@ -68,6 +70,7 @@ def main():
 
                 messages_sent = 0
                 messages_rejected = 0
+                alerts_sent = 0
 
                 for bus in ibus:
                     message = {
@@ -92,6 +95,14 @@ def main():
 
                     messages_sent += 1
 
+                    alert = build_arrival_alert(message)
+                    if alert is not None:
+                        producer.send(
+                            KAFKA_TOPIC_TRANSPORT_ALERTS,
+                            value=alert,
+                        )
+                        alerts_sent += 1
+
                 producer.flush()
 
                 print(
@@ -100,6 +111,7 @@ def main():
                 print(
                     f"Mensajes rechazados por validación: {messages_rejected}"
                 )
+                print(f"Alertas enviadas a Kafka: {alerts_sent}")
 
             except requests.RequestException as error:
                 print(f"Error API TMB: {error}")
