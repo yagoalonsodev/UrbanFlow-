@@ -1,11 +1,20 @@
 import os
 
 from pathlib import Path
+from dotenv import load_dotenv
+
+
+# CARGAR VARIABLES DEL .ENV
+
+BASE_PROJECT_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BASE_PROJECT_DIR / ".env")
+
 
 # PROJECT
 
 BASE_DIR = Path(
-    os.getenv("URBANFLOW_BASE_DIR", "/app")
+    os.getenv("URBANFLOW_BASE_DIR", str(BASE_PROJECT_DIR))
 )
 
 
@@ -55,7 +64,6 @@ POSTGRES_PORT = os.getenv(
 
 POSTGRES_HOST = os.getenv(
     "POSTGRES_HOST",
-    "postgres",
 )
 
 
@@ -86,4 +94,13 @@ MINIO_ROOT_USER = os.getenv(
 
 MINIO_ROOT_PASSWORD = os.getenv(
     "MINIO_ROOT_PASSWORD",
+)
+MINIO_ENDPOINT = os.getenv(
+    "MINIO_ENDPOINT",
+    "localhost:9000",
+)
+
+MINIO_BUCKET = os.getenv(
+    "MINIO_BUCKET",
+    "urbanflow",
 )

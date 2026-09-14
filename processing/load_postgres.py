@@ -3,12 +3,9 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 
-from utils.config import (
-    POSTGRES_DATABASE_URL,
-    TMB_PROCESSED_DIR,
-)
-
+from utils.config import POSTGRES_DATABASE_URL, TMB_PROCESSED_DIR
 
 logging.basicConfig(
     level=logging.INFO,
@@ -16,9 +13,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger("urbanflow")
-
-
-PROCESSED_BASE_DIR = TMB_PROCESSED_DIR
 
 
 DATASETS = [
@@ -31,6 +25,7 @@ DATASETS = [
     "stop_times",
 ]
 
+
 DELETE_ORDER = [
     "stop_times",
     "trips",
@@ -41,12 +36,12 @@ DELETE_ORDER = [
     "agency",
 ]
 
+
 def get_latest_processed_snapshot() -> Path:
     """Obtiene el snapshot Processed más reciente."""
-
     snapshot_dirs = [
         directory
-        for directory in PROCESSED_BASE_DIR.iterdir()
+        for directory in TMB_PROCESSED_DIR.iterdir()
         if directory.is_dir()
         and len(directory.name) == 10
         and directory.name[4] == "-"
@@ -54,9 +49,7 @@ def get_latest_processed_snapshot() -> Path:
     ]
 
     if not snapshot_dirs:
-        raise FileNotFoundError(
-            "No se encontraron snapshots procesados."
-        )
+        raise FileNotFoundError("No se encontraron snapshots procesados.")
 
     latest_snapshot = max(
         snapshot_dirs,
@@ -71,43 +64,36 @@ def get_latest_processed_snapshot() -> Path:
     return latest_snapshot
 
 
-def create_database_engine():
+def create_database_engine() -> Engine:
     """Crea la conexión con PostgreSQL."""
-
-    logger.info("Conectando con PostgreSQL...")
+    logger.info("Conectandocon PostgreSQL...")
 
     engine = create_engine(POSTGRES_DATABASE_URL)
 
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
 
-    logger.info(
-        "Conexión con PostgreSQL establecida correctamente."
-    )
+    logger.info("Conexión con PostgreSQL establecida correctamente.")
 
     return engine
 
 
 def delete_snapshot(
-    engine,
+    engine: Engine,
     snapshot_date,
 ) -> None:
-    """
-    Elimina únicamente el snapshot que se va a cargar.
+    """Elimina únicamente el snapshot que se va a cargar.
 
-    Esto permite volver a ejecutar el DAG el mismo día
-    sin generar registros duplicados.
+    Esto permite volver a ejecutar el DAG el mismo día sin generar registros
+    duplicados.
     """
-
     logger.info(
         "Eliminando snapshot existente: %s",
         snapshot_date,
     )
 
     with engine.begin() as connection:
-
         for dataset in DELETE_ORDER:
-
             connection.execute(
                 text(
                     f"""
@@ -127,13 +113,12 @@ def delete_snapshot(
 
 
 def load_dataset(
-    engine,
+    engine: Engine,
     dataset_name: str,
     processed_snapshot: Path,
     snapshot_date,
 ) -> None:
     """Carga un dataset Processed en PostgreSQL."""
-
     dataset_dir = processed_snapshot / dataset_name
 
     csv_files = [
@@ -144,8 +129,7 @@ def load_dataset(
 
     if not csv_files:
         raise FileNotFoundError(
-            f"No se encontraron CSV para {dataset_name}: "
-            f"{dataset_dir}"
+            f"No se encontraron CSV para {dataset_name}: {dataset_dir}"
         )
 
     logger.info(
@@ -153,17 +137,13 @@ def load_dataset(
         dataset_name,
     )
 
-    dataframes = [
-        pd.read_csv(file)
-        for file in csv_files
-    ]
+    dataframes = [pd.read_csv(file) for file in csv_files]
 
     dataframe = pd.concat(
         dataframes,
         ignore_index=True,
     )
 
-    # Añadimos la fecha del snapshot.
     dataframe["snapshot_date"] = snapshot_date
 
     dataframe.to_sql(
@@ -176,8 +156,7 @@ def load_dataset(
     )
 
     logger.info(
-        "%s cargado correctamente: %d registros "
-        "(snapshot: %s)",
+        "%s cargado correctamente: %d registros (snapshot: %s)",
         dataset_name,
         len(dataframe),
         snapshot_date,
@@ -185,20 +164,17 @@ def load_dataset(
 
 
 def validate_counts(
-    engine,
+    engine: Engine,
     snapshot_date,
 ) -> None:
     """Comprueba el número de registros del snapshot cargado."""
-
     logger.info(
         "VALIDACIÓN DE REGISTROS - SNAPSHOT %s",
         snapshot_date,
     )
 
     with engine.connect() as connection:
-
         for dataset in DATASETS:
-
             result = connection.execute(
                 text(
                     f"""
@@ -222,14 +198,12 @@ def validate_counts(
 
 
 def validate_history(
-    engine,
+    engine: Engine,
 ) -> None:
     """Muestra los snapshots almacenados históricamente."""
-
     logger.info("HISTÓRICO DE SNAPSHOTS")
 
     with engine.connect() as connection:
-
         result = connection.execute(
             text(
                 """
@@ -246,13 +220,10 @@ def validate_history(
         rows = result.fetchall()
 
         if not rows:
-            logger.info(
-                "No existen snapshots históricos."
-            )
+            logger.info("No existen snapshots históricos.")
             return
 
         for row in rows:
-
             logger.info(
                 "Snapshot %s: %d viajes",
                 row.snapshot_date,
@@ -261,14 +232,10 @@ def validate_history(
 
 
 def main():
-
-    logger.info(
-        "URBANFLOW - CARGA POSTGRESQL HISTÓRICA"
-    )
+    logger.info("URBANFLOW - CARGA POSTGRESQL HISTÓRICA")
 
     processed_snapshot = get_latest_processed_snapshot()
 
-    # El nombre del directorio es YYYY-MM-DD.
     snapshot_date = pd.to_datetime(
         processed_snapshot.name,
         format="%Y-%m-%d",
@@ -281,35 +248,33 @@ def main():
 
     engine = create_database_engine()
 
-    # Eliminamos solamente ese día.
-    # Los snapshots anteriores permanecen intactos.
-    delete_snapshot(
-        engine,
-        snapshot_date,
-    )
-
-    for dataset in DATASETS:
-
-        load_dataset(
+    try:
+        delete_snapshot(
             engine,
-            dataset,
-            processed_snapshot,
             snapshot_date,
         )
 
-    validate_counts(
-        engine,
-        snapshot_date,
-    )
+        for dataset in DATASETS:
+            load_dataset(
+                engine,
+                dataset,
+                processed_snapshot,
+                snapshot_date,
+            )
 
-    validate_history(
-        engine,
-    )
+        validate_counts(
+            engine,
+            snapshot_date,
+        )
 
-    logger.info(
-        "CARGA POSTGRESQL HISTÓRICA "
-        "COMPLETADA CORRECTAMENTE"
-    )
+        validate_history(engine)
+
+        logger.info(
+            "CARGA POSTGRESQL HISTÓRICA COMPLETADA CORRECTAMENTE"
+        )
+
+    finally:
+        engine.dispose()
 
 
 if __name__ == "__main__":
