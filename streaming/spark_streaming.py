@@ -196,6 +196,17 @@ def main():
         "arrival_text",
     )
 
+    final_stream = final_stream.filter(
+        col("event_timestamp").isNotNull()
+        & col("line").isNotNull()
+        & col("route_id").isNotNull()
+        & col("stop_id").isNotNull()
+        & col("arrival_minutes").isNotNull()
+        & col("arrival_seconds").isNotNull()
+        & (col("arrival_minutes") >= 0)
+        & (col("arrival_seconds") >= 0)
+    )
+
     # Kafka → Spark → PostgreSQL
 
     query = (

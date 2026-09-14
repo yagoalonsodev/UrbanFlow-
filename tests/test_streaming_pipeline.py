@@ -138,7 +138,16 @@ def test_real_kafka_accepts_event():
     try:
         future = kafka_producer.send(
             producer.KAFKA_TOPIC_GTFS_REALTIME,
-            {"test": "urbanflow"},
+            {
+                "timestamp": 1789387200,
+                "destination": "Centre",
+                "line": "TEST",
+                "route_id": "test-route",
+                "stop": "test-stop",
+                "time_in_minutes": 1,
+                "time_in_seconds": 60,
+                "text_ca": "1 min",
+            },
         )
         future.get(timeout=10)
     finally:
