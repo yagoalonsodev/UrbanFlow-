@@ -45,6 +45,14 @@ jobs:
         run: |
           python -m compileall -q dags ingestion processing streaming tests utils
 
+      - name: Ejecutar Ruff
+        run: |
+          python -m ruff check dags ingestion processing streaming tests utils
+
+      - name: Ejecutar Mypy
+        run: |
+          python -m mypy dags ingestion processing streaming utils
+
       - name: Validar Docker Compose
         run: |
           docker compose config --quiet

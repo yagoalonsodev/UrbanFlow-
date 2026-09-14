@@ -12,3 +12,5 @@ pytest
 kafka-python
 python-dotenv
 minio
+ruff
+mypy
