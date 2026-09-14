@@ -47,16 +47,17 @@ def get_snapshot_directories(
 
 def get_files(
     directory: Path,
+    extensions: set[str],
 ):
     """
-    Obtiene únicamente archivos de datos válidos.
+    Obtiene únicamente archivos con las extensiones indicadas.
     """
 
     return [
         file
         for file in directory.rglob("*")
         if file.is_file()
-        and file.suffix.lower() in {".csv", ".zip"}
+        and file.suffix.lower() in extensions
     ]
 
 
@@ -65,11 +66,12 @@ def upload_snapshot(
     prefix: str,
 ) -> None:
     """
-    Sube un snapshot completo a MinIO.
+    Sube un snapshot RAW completo a MinIO.
     """
 
     files = get_files(
-        snapshot_dir
+        snapshot_dir,
+        {".zip"},
     )
 
     logger.info(
@@ -98,12 +100,12 @@ def upload_snapshot(
         )
 
 
-def upload_all_snapshots(
+def upload_all_raw_snapshots(
     base_directory: Path,
     prefix: str,
 ) -> None:
     """
-    Sube todos los snapshots disponibles.
+    Sube todos los snapshots RAW disponibles.
     """
 
     snapshots = get_snapshot_directories(
@@ -117,7 +119,7 @@ def upload_all_snapshots(
         )
 
     logger.info(
-        "Encontrados %d snapshots en %s",
+        "Encontrados %d snapshots RAW en %s",
         len(snapshots),
         base_directory,
     )
@@ -130,6 +132,47 @@ def upload_all_snapshots(
         )
 
 
+def upload_processed(
+    base_directory: Path,
+    prefix: str,
+) -> None:
+    """
+    Sube los datos PROCESSED en formato Parquet.
+    """
+
+    files = get_files(
+        base_directory,
+        {".parquet"},
+    )
+
+    if not files:
+        raise FileNotFoundError(
+            f"No se encontraron archivos Parquet en "
+            f"{base_directory}"
+        )
+
+    logger.info(
+        "Encontrados %d archivos Parquet PROCESSED.",
+        len(files),
+    )
+
+    for file in files:
+
+        relative_path = file.relative_to(
+            base_directory
+        )
+
+        object_name = (
+            f"{prefix}/"
+            f"{relative_path}"
+        )
+
+        upload_file(
+            file,
+            object_name,
+        )
+
+
 def main():
     logger.info(
         "URBANFLOW - CARGA DE DATOS A MINIO"
@@ -139,7 +182,7 @@ def main():
         "Subiendo snapshots RAW..."
     )
 
-    upload_all_snapshots(
+    upload_all_raw_snapshots(
         TMB_RAW_DIR,
         "raw/tmb",
     )
@@ -149,16 +192,16 @@ def main():
     )
 
     logger.info(
-        "Subiendo snapshots PROCESSED..."
+        "Subiendo datos PROCESSED en Parquet..."
     )
 
-    upload_all_snapshots(
+    upload_processed(
         TMB_PROCESSED_DIR,
         "processed/tmb",
     )
 
     logger.info(
-        "Snapshots PROCESSED subidos correctamente."
+        "Datos PROCESSED subidos correctamente."
     )
 
     logger.info(

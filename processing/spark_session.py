@@ -2,13 +2,9 @@ from pyspark.sql import SparkSession
 
 
 def create_spark_session() -> SparkSession:
-    """
-    Crea la SparkSession de UrbanFlow.
-    """
-
+    """Crea la SparkSession de UrbanFlow."""
     spark = (
-        SparkSession.builder
-        .appName("UrbanFlow-GTFS-Processing")
+        SparkSession.builder.appName("UrbanFlow-GTFS-Processing")
         .master("local[*]")
         .getOrCreate()
     )
@@ -18,7 +14,7 @@ def create_spark_session() -> SparkSession:
     return spark
 
 
-def main():
+def main() -> None:
     spark = create_spark_session()
 
     print("SparkSession creada correctamente.")

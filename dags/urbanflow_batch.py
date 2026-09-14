@@ -1,40 +1,61 @@
 from datetime import datetime
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
-
-from ingestion.download_gtfs import main as download_gtfs
-from ingestion.validate_data import main as validate_data
-from processing.transform_gtfs_spark import main as transform_gtfs_spark
-from processing.load_postgres import main as load_postgres
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.bash import BashOperator
 
 
 with DAG(
     dag_id="urbanflow_batch",
     start_date=datetime(2026, 1, 1),
-    schedule="@daily",
+    schedule=None,
     catchup=False,
     tags=["urbanflow", "batch", "gtfs"],
 ) as dag:
 
-    download_task = PythonOperator(
+    download_gtfs = BashOperator(
         task_id="download_gtfs",
-        python_callable=download_gtfs,
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/ingestion/download_gtfs.py"
+        ),
     )
 
-    validate_task = PythonOperator(
+    validate_data = BashOperator(
         task_id="validate_data",
-        python_callable=validate_data,
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/ingestion/validate_data.py"
+        ),
     )
 
-    transform_task = PythonOperator(
-        task_id="transform_gtfs_spark",
-        python_callable=transform_gtfs_spark,
+    transform_gtfs = BashOperator(
+        task_id="transform_gtfs",
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/transform_gtfs_spark.py"
+        ),
     )
 
-    load_task = PythonOperator(
+    upload_minio = BashOperator(
+        task_id="upload_minio",
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/upload_minio.py"
+        ),
+    )
+
+    load_postgres = BashOperator(
         task_id="load_postgres",
-        python_callable=load_postgres,
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/load_postgres.py"
+        ),
     )
 
-    download_task >> validate_task >> transform_task >> load_task
+    (
+        download_gtfs
+        >> validate_data
+        >> transform_gtfs
+        >> upload_minio
+        >> load_postgres
+    )

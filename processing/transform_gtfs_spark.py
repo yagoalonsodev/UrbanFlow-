@@ -241,24 +241,47 @@ def transform_dataframes(dataframes):
 
 
 def save_processed(
+
     dataframes,
+
     snapshot_date: str,
+
 ):
-    """Guarda los datos procesados."""
+
+    """Guarda los datos procesados en formato Parquet."""
+
+    year = snapshot_date[:4]
+
+    month = snapshot_date[5:7]
+
+    day = snapshot_date[8:10]
 
     processed_dir = (
+
         TMB_PROCESSED_DIR
-        / snapshot_date
+
+        / f"year={year}"
+
+        / f"month={month}"
+
+        / f"day={day}"
+
     )
 
     processed_dir.mkdir(
+
         parents=True,
+
         exist_ok=True,
+
     )
 
     logger.info(
+
         "Guardando datos procesados en: %s",
+
         processed_dir,
+
     )
 
     for name, dataframe in dataframes.items():
@@ -266,19 +289,24 @@ def save_processed(
         output_path = processed_dir / name
 
         (
+
             dataframe
+
             .write
+
             .mode("overwrite")
-            .option("header", True)
-            .csv(str(output_path))
+
+            .parquet(str(output_path))
+
         )
 
         logger.info(
-            "%s guardado correctamente.",
+
+            "%s guardado correctamente en formato Parquet.",
+
             name,
+
         )
-
-
 def main():
 
     spark = create_spark_session()
