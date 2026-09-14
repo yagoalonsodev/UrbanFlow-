@@ -44,6 +44,14 @@ with DAG(
         ),
     )
 
+    validate_processed_snapshot = BashOperator(
+        task_id="validate_processed_snapshot",
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/validate_processed_snapshot.py"
+        ),
+    )
+
     upload_minio = BashOperator(
         task_id="upload_minio",
         bash_command=(
@@ -73,6 +81,7 @@ with DAG(
         >> validate_data
         >> transform_gtfs
         >> data_quality
+        >> validate_processed_snapshot
         >> upload_minio
         >> load_postgres
         >> load_dimensional
