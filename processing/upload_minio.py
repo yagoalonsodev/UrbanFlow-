@@ -1,10 +1,15 @@
 import logging
-import os
+
 from pathlib import Path
 
-import boto3
-from botocore.client import Config
-from botocore.exceptions import ClientError
+from utils.config import (
+    TMB_PROCESSED_DIR,
+    TMB_RAW_DIR,
+)
+
+from utils.minio_client import (
+    upload_file,
+)
 
 
 logging.basicConfig(
@@ -15,78 +20,12 @@ logging.basicConfig(
 logger = logging.getLogger("urbanflow")
 
 
-BASE_DIR = Path("/app")
-
-RAW_BASE_DIR = (
-    BASE_DIR
-    / "data"
-    / "raw"
-    / "tmb"
-)
-
-PROCESSED_BASE_DIR = (
-    BASE_DIR
-    / "data"
-    / "processed"
-    / "tmb"
-)
-
-MINIO_ENDPOINT = "http://minio:9000"
-
-MINIO_ACCESS_KEY = os.getenv("MINIO_ROOT_USER")
-MINIO_SECRET_KEY = os.getenv("MINIO_ROOT_PASSWORD")
-
-BUCKET_NAME = "urbanflow"
-
-
-def create_minio_client():
-    """Crea el cliente para conectarse con MinIO."""
-
-    logger.info("Conectando con MinIO...")
-
-    client = boto3.client(
-        "s3",
-        endpoint_url=MINIO_ENDPOINT,
-        aws_access_key_id=MINIO_ACCESS_KEY,
-        aws_secret_access_key=MINIO_SECRET_KEY,
-        config=Config(signature_version="s3v4"),
-        region_name="us-east-1",
-    )
-
-    logger.info(
-        "Conexión con MinIO establecida correctamente."
-    )
-
-    return client
-
-
-def validate_bucket(client) -> None:
-    """Comprueba que el bucket existe."""
-
-    logger.info(
-        "Comprobando bucket: %s",
-        BUCKET_NAME,
-    )
-
-    try:
-        client.head_bucket(
-            Bucket=BUCKET_NAME
-        )
-
-    except ClientError as error:
-        raise RuntimeError(
-            f"El bucket '{BUCKET_NAME}' no existe "
-            "o no se puede acceder a él."
-        ) from error
-
-    logger.info(
-        "Bucket '%s' disponible correctamente.",
-        BUCKET_NAME,
-    )
-
-
-def get_snapshot_directories(directory: Path):
-    """Obtiene únicamente snapshots con formato YYYY-MM-DD."""
+def get_snapshot_directories(
+    directory: Path,
+):
+    """
+    Obtiene únicamente snapshots con formato YYYY-MM-DD.
+    """
 
     if not directory.exists():
         raise FileNotFoundError(
@@ -106,8 +45,12 @@ def get_snapshot_directories(directory: Path):
     )
 
 
-def get_files(directory: Path):
-    """Obtiene únicamente archivos de datos válidos."""
+def get_files(
+    directory: Path,
+):
+    """
+    Obtiene únicamente archivos de datos válidos.
+    """
 
     return [
         file
@@ -118,13 +61,16 @@ def get_files(directory: Path):
 
 
 def upload_snapshot(
-    client,
     snapshot_dir: Path,
     prefix: str,
 ) -> None:
-    """Sube un snapshot completo a MinIO."""
+    """
+    Sube un snapshot completo a MinIO.
+    """
 
-    files = get_files(snapshot_dir)
+    files = get_files(
+        snapshot_dir
+    )
 
     logger.info(
         "Snapshot %s: %d archivos encontrados.",
@@ -134,30 +80,31 @@ def upload_snapshot(
 
     for file in files:
 
-        relative_path = file.relative_to(snapshot_dir)
+        relative_path = file.relative_to(
+            snapshot_dir
+        )
 
         object_name = (
-            f"{prefix}/{snapshot_dir.name}/{relative_path}"
+            f"{prefix}/"
+            f"year={snapshot_dir.name[:4]}/"
+            f"month={snapshot_dir.name[5:7]}/"
+            f"day={snapshot_dir.name[8:10]}/"
+            f"{relative_path}"
         )
 
-        client.upload_file(
-            str(file),
-            BUCKET_NAME,
-            object_name,
-        )
-
-        logger.info(
-            "Subido: %s",
+        upload_file(
+            file,
             object_name,
         )
 
 
 def upload_all_snapshots(
-    client,
     base_directory: Path,
     prefix: str,
 ) -> None:
-    """Sube todos los snapshots disponibles."""
+    """
+    Sube todos los snapshots disponibles.
+    """
 
     snapshots = get_snapshot_directories(
         base_directory
@@ -165,7 +112,8 @@ def upload_all_snapshots(
 
     if not snapshots:
         raise FileNotFoundError(
-            f"No se encontraron snapshots en {base_directory}"
+            f"No se encontraron snapshots en "
+            f"{base_directory}"
         )
 
     logger.info(
@@ -177,7 +125,6 @@ def upload_all_snapshots(
     for snapshot in snapshots:
 
         upload_snapshot(
-            client,
             snapshot,
             prefix,
         )
@@ -188,17 +135,12 @@ def main():
         "URBANFLOW - CARGA DE DATOS A MINIO"
     )
 
-    client = create_minio_client()
-
-    validate_bucket(client)
-
     logger.info(
         "Subiendo snapshots RAW..."
     )
 
     upload_all_snapshots(
-        client,
-        RAW_BASE_DIR,
+        TMB_RAW_DIR,
         "raw/tmb",
     )
 
@@ -211,8 +153,7 @@ def main():
     )
 
     upload_all_snapshots(
-        client,
-        PROCESSED_BASE_DIR,
+        TMB_PROCESSED_DIR,
         "processed/tmb",
     )
 
