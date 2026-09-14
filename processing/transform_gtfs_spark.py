@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 from pyspark.sql import functions as F
 
@@ -8,6 +7,10 @@ from processing.process_gtfs import (
     load_gtfs,
 )
 from processing.spark_session import create_spark_session
+from utils.config import (
+    TMB_PROCESSED_DIR,
+    TMB_RAW_DIR,
+)
 
 
 logging.basicConfig(
@@ -18,29 +21,12 @@ logging.basicConfig(
 logger = logging.getLogger("urbanflow")
 
 
-BASE_DIR = Path("/app")
-
-RAW_BASE_DIR = (
-    BASE_DIR
-    / "data"
-    / "raw"
-    / "tmb"
-)
-
-PROCESSED_BASE_DIR = (
-    BASE_DIR
-    / "data"
-    / "processed"
-    / "tmb"
-)
-
-
 def get_latest_snapshot_date() -> str:
     """Obtiene la fecha del último snapshot GTFS."""
 
     snapshot_dirs = [
         directory
-        for directory in RAW_BASE_DIR.iterdir()
+        for directory in TMB_RAW_DIR.iterdir()
         if directory.is_dir()
         and directory.name[:4].isdigit()
         and directory.name[4] == "-"
@@ -48,7 +34,7 @@ def get_latest_snapshot_date() -> str:
 
     if not snapshot_dirs:
         raise FileNotFoundError(
-            f"No se encontraron snapshots GTFS en {RAW_BASE_DIR}"
+            f"No se encontraron snapshots GTFS en {TMB_RAW_DIR}"
         )
 
     latest_snapshot = max(
@@ -254,10 +240,14 @@ def transform_dataframes(dataframes):
     }
 
 
-def save_processed(dataframes, snapshot_date):
+def save_processed(
+    dataframes,
+    snapshot_date: str,
+):
+    """Guarda los datos procesados."""
 
     processed_dir = (
-        PROCESSED_BASE_DIR
+        TMB_PROCESSED_DIR
         / snapshot_date
     )
 

@@ -1,27 +1,38 @@
 import logging
-import os
-import requests
 
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile, BadZipFile
 
-from utils.config import TMB_RAW_DIR
+import requests
 
-TMB_BASE_URL = "https://api.tmb.cat/v1/static/datasets/gtfs.zip"
-TMB_APP_ID = os.getenv("TMB_APP_ID")
-TMB_APP_KEY = os.getenv("TMB_APP_KEY")
+from utils.config import (
+    TMB_APP_ID,
+    TMB_APP_KEY,
+    TMB_RAW_DIR,
+)
 
-# Validacion de configuracion TMB y lanzamos Raise
+from utils.constants import (
+    TMB_BASE_URL,
+)
+
+
+# Validación de configuración TMB
+
 if not TMB_APP_ID:
     raise ValueError("La variable TMB_APP_ID no está configurada.")
 
 if not TMB_APP_KEY:
     raise ValueError("La variable TMB_APP_KEY no está configurada.")
 
-TMB_RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-logger = logging.getLogger(__name__) # aqui se guardan los logs de la app.
+TMB_RAW_DIR.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 def download_gtfs() -> Path:
@@ -32,12 +43,21 @@ def download_gtfs() -> Path:
     date = datetime.now().strftime("%Y-%m-%d")
 
     output_dir = TMB_RAW_DIR / date
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
     output_file = output_dir / "tmb_gtfs.zip"
 
-    logger.info("Iniciando descarga del GTFS de TMB...")
-    logger.info("URL: %s", TMB_BASE_URL)
+    logger.info(
+        "Iniciando descarga del GTFS de TMB..."
+    )
+
+    logger.info(
+        "URL: %s",
+        TMB_BASE_URL,
+    )
 
     response = requests.get(
         TMB_BASE_URL,
@@ -48,9 +68,11 @@ def download_gtfs() -> Path:
         timeout=60,
     )
 
-    response.raise_for_status() # si sale un codigo 200 se guarda el contenido
+    response.raise_for_status()
 
-    output_file.write_bytes(response.content)
+    output_file.write_bytes(
+        response.content
+    )
 
     logger.info(
         "GTFS descargado correctamente: %s",
@@ -68,11 +90,13 @@ def download_gtfs() -> Path:
 def validate_gtfs(gtfs_path: Path) -> None:
 
     """
-    Comprobamos que el archivo es un zip con 
+    Comprobamos que el archivo es un zip con
     GTFS obligatorios.
     """
 
-    logger.info("Validando archivo GTFS...")
+    logger.info(
+        "Validando archivo GTFS..."
+    )
 
     required_files = {
         "agency.txt",
@@ -84,7 +108,11 @@ def validate_gtfs(gtfs_path: Path) -> None:
     }
 
     try:
-        with ZipFile(gtfs_path, "r") as zip_file:
+        with ZipFile(
+            gtfs_path,
+            "r",
+        ) as zip_file:
+
             files = {
                 Path(file).name
                 for file in zip_file.namelist()
@@ -102,8 +130,14 @@ def validate_gtfs(gtfs_path: Path) -> None:
             f"Faltan archivos GTFS obligatorios: {missing_files}"
         )
 
-    logger.info("Validación GTFS completada correctamente.")
-    logger.info("Archivos encontrados: %d", len(files))
+    logger.info(
+        "Validación GTFS completada correctamente."
+    )
+
+    logger.info(
+        "Archivos encontrados: %d",
+        len(files),
+    )
 
 
 def extract_gtfs(gtfs_path: Path) -> Path:
@@ -111,15 +145,28 @@ def extract_gtfs(gtfs_path: Path) -> Path:
     Extraemos el ZIP GTFS en la carpeta extracted.
     """
 
-    extracted_dir = gtfs_path.parent / "extracted"
+    extracted_dir = (
+        gtfs_path.parent / "extracted"
+    )
 
-    extracted_dir.mkdir(parents=True, exist_ok=True)
+    extracted_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    logger.info("Extrayendo archivo GTFS...")
+    logger.info(
+        "Extrayendo archivo GTFS..."
+    )
 
     try:
-        with ZipFile(gtfs_path, "r") as zip_file:
-            zip_file.extractall(extracted_dir)
+        with ZipFile(
+            gtfs_path,
+            "r",
+        ) as zip_file:
+
+            zip_file.extractall(
+                extracted_dir
+            )
 
     except BadZipFile as error:
         raise ValueError(
@@ -135,22 +182,39 @@ def extract_gtfs(gtfs_path: Path) -> Path:
 
 
 def main():
-    logger.info("URBANFLOW BARCELONA - TMB GTFS INGESTION")
+    logger.info(
+        "URBANFLOW BARCELONA - TMB GTFS INGESTION"
+    )
 
     try:
         gtfs_path = download_gtfs()
-        validate_gtfs(gtfs_path)
-        extract_gtfs(gtfs_path)
 
-        logger.info("INGESTA COMPLETADA CORRECTAMENTE")
+        validate_gtfs(
+            gtfs_path
+        )
+
+        extract_gtfs(
+            gtfs_path
+        )
+
+        logger.info(
+            "INGESTA COMPLETADA CORRECTAMENTE"
+        )
 
     except requests.RequestException as error:
-        logger.error("Error descargando el GTFS: %s", error)
+        logger.error(
+            "Error descargando el GTFS: %s",
+            error,
+        )
         raise
 
     except (OSError, ValueError) as error:
-        logger.error("Error procesando el GTFS: %s", error)
+        logger.error(
+            "Error procesando el GTFS: %s",
+            error,
+        )
         raise
+
 
 if __name__ == "__main__":
     main()
