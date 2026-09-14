@@ -11,6 +11,7 @@ from utils.constants import (
     STREAMING_INTERVAL_SECONDS,
     TMB_REALTIME_URL,
 )
+from streaming.event_validation import validate_realtime_event
 
 
 def create_producer():
@@ -66,6 +67,7 @@ def main():
                 )
 
                 messages_sent = 0
+                messages_rejected = 0
 
                 for bus in ibus:
                     message = {
@@ -79,10 +81,14 @@ def main():
                         "text_ca": bus.get("text-ca"),
                     }
 
-                    producer.send(
-                        KAFKA_TOPIC_GTFS_REALTIME,
-                        value=message,
-                    )
+                    try:
+                        validate_realtime_event(message)
+                    except ValueError as error:
+                        messages_rejected += 1
+                        print(f"Evento GTFS-RT rechazado: {error}")
+                        continue
+
+                    producer.send(KAFKA_TOPIC_GTFS_REALTIME, value=message)
 
                     messages_sent += 1
 
@@ -90,6 +96,9 @@ def main():
 
                 print(
                     f"Mensajes enviados a Kafka: {messages_sent}"
+                )
+                print(
+                    f"Mensajes rechazados por validación: {messages_rejected}"
                 )
 
             except requests.RequestException as error:
