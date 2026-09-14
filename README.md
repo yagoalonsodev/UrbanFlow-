@@ -1095,7 +1095,7 @@ El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos 
 
 # 📌 Estado y roadmap
 
-El estado actual incluye ingestion GTFS, transformación Spark a Parquet, validaciones de calidad, carga en MinIO y PostgreSQL, modelo dimensional, streaming GTFS-RT, alertas, errores, dashboard Metabase y CI básico.
+El estado actual incluye ingestion GTFS, transformación Spark a Parquet, validaciones de calidad, carga en MinIO y PostgreSQL, modelo dimensional, streaming GTFS-RT estable, alertas, errores, métricas realtime, dashboard Metabase, CI, Ruff y Mypy.
 
 ## Fase 1 — Preparación
 
@@ -1143,7 +1143,7 @@ El estado actual incluye ingestion GTFS, transformación Spark a Parquet, valida
 
 - [x] Transformar eventos.
 
-- [ ] Calcular métricas.
+- [x] Calcular métricas.
 
 - [ ] Implementar detección de anomalías.
 
@@ -1233,9 +1233,9 @@ El estado actual incluye ingestion GTFS, transformación Spark a Parquet, valida
 
 - [x] Ejecutar tests automáticamente.
 
-- [ ] Lint.
+- [x] Lint.
 
-- [ ] Type checking.
+- [x] Type checking.
 
 - [x] Docker build.
 
