@@ -33,6 +33,10 @@ def check_null_identifiers(dataframes: dict[str, DataFrame]) -> None:
         for column in columns:
             null_count = dataframe.filter(F.col(column).isNull()).count()
             logger.info("%s.%s nulos: %d", name, column, null_count)
+            if null_count:
+                raise ValueError(
+                    f"{name}.{column} contiene {null_count} identificadores nulos."
+                )
 
 
 def check_duplicates(dataframes: dict[str, DataFrame]) -> None:
@@ -45,6 +49,10 @@ def check_duplicates(dataframes: dict[str, DataFrame]) -> None:
         duplicate_rows = total_rows - distinct_rows
 
         logger.info("%s: %d registros duplicados", name, duplicate_rows)
+        if duplicate_rows:
+            raise ValueError(
+                f"{name} contiene {duplicate_rows} registros duplicados."
+            )
 
 
 def check_referential_integrity(dataframes: dict[str, DataFrame]) -> None:
@@ -67,6 +75,10 @@ def check_referential_integrity(dataframes: dict[str, DataFrame]) -> None:
         .count()
     )
     logger.info("trips.route_ids sin correspondencia: %d", invalid_routes)
+    if invalid_routes:
+        raise ValueError(
+            f"{invalid_routes} route_id de trips no tienen correspondencia en routes."
+        )
 
     invalid_trips = (
         stop_times.select("trip_id")
@@ -79,6 +91,10 @@ def check_referential_integrity(dataframes: dict[str, DataFrame]) -> None:
         .count()
     )
     logger.info("stop_times.trip_ids sin correspondencia: %d", invalid_trips)
+    if invalid_trips:
+        raise ValueError(
+            f"{invalid_trips} trip_id de stop_times no tienen correspondencia en trips."
+        )
 
     invalid_stops = (
         stop_times.select("stop_id")
@@ -91,6 +107,10 @@ def check_referential_integrity(dataframes: dict[str, DataFrame]) -> None:
         .count()
     )
     logger.info("stop_times.stop_ids sin correspondencia: %d", invalid_stops)
+    if invalid_stops:
+        raise ValueError(
+            f"{invalid_stops} stop_id de stop_times no tienen correspondencia en stops."
+        )
 
 
 def check_coordinates(dataframes: dict[str, DataFrame]) -> None:
@@ -112,6 +132,10 @@ def check_coordinates(dataframes: dict[str, DataFrame]) -> None:
     logger.info("Paradas sin latitud: %d", missing_lat)
     logger.info("Paradas sin longitud: %d", missing_lon)
     logger.info("Coordenadas fuera de rango: %d", invalid_coordinates)
+    if missing_lat or missing_lon or invalid_coordinates:
+        raise ValueError(
+            "Las paradas contienen coordenadas nulas o fuera de rango."
+        )
 
 
 def main():

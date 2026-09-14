@@ -36,6 +36,14 @@ with DAG(
         ),
     )
 
+    data_quality = BashOperator(
+        task_id="data_quality",
+        bash_command=(
+            "set -e; "
+            "python /opt/airflow/urbanflow/processing/data_quality.py"
+        ),
+    )
+
     upload_minio = BashOperator(
         task_id="upload_minio",
         bash_command=(
@@ -64,6 +72,7 @@ with DAG(
         download_gtfs
         >> validate_data
         >> transform_gtfs
+        >> data_quality
         >> upload_minio
         >> load_postgres
         >> load_dimensional
