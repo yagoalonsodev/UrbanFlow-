@@ -29,6 +29,17 @@ def download_module(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         utils.config,
+        "TMB_APP_ID",
+        "test-app-id",
+    )
+    monkeypatch.setattr(
+        utils.config,
+        "TMB_APP_KEY",
+        "test-app-key",
+    )
+
+    monkeypatch.setattr(
+        utils.config,
         "TMB_RAW_DIR",
         tmp_path / "raw",
     )
