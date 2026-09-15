@@ -1,208 +1,170 @@
 # 🚇 UrbanFlow — Real-Time Urban Mobility Data Platform
 
-Plataforma de ingeniería de datos **end-to-end** orientada al análisis de movilidad urbana y transporte público en tiempo real.
+Plataforma de **Data Engineering end-to-end** orientada al análisis de movilidad urbana y transporte público de Barcelona.
 
-El proyecto integra diferentes fuentes de datos y combina **procesamiento batch y streaming**, permitiendo ingerir, transformar, validar, almacenar y analizar información de transporte de forma automatizada.
+UrbanFlow integra fuentes **GTFS y GTFS-Realtime de TMB** y combina procesamiento **batch y streaming**, almacenamiento en Data Lake, Data Warehouse dimensional, calidad de datos, orquestación, analítica y un agente de IA capaz de consultar el estado de la plataforma.
 
-El objetivo principal es construir una arquitectura similar a la que podría utilizarse en un entorno profesional de ingeniería de datos, utilizando tecnologías como **Python, Apache Kafka, Apache Spark, Apache Airflow, PostgreSQL, MinIO/S3, Docker y AWS**.
+El proyecto está diseñado como una arquitectura reproducible mediante Docker y orientada a demostrar conocimientos prácticos de **Data Engineering, Big Data, Cloud, DevOps y AI Agents**.
 
 ---
 
-## 🎯 Objetivos del proyecto
+## 🎯 Objetivos
 
-UrbanFlow tiene como objetivos:
+UrbanFlow busca implementar una plataforma completa capaz de:
 
-- Integrar diferentes fuentes de datos.
-
-- Construir pipelines de datos automatizados.
-
-- Implementar procesos ETL/ELT.
-
-- Procesar eventos en tiempo real mediante Apache Kafka.
-
-- Utilizar Apache Spark para procesamiento batch y streaming.
-
-- Construir un Data Lake.
-
-- Diseñar un Data Warehouse mediante un modelo dimensional.
-
-- Implementar controles de calidad de datos.
-
-- Automatizar procesos mediante Apache Airflow.
-
-- Generar métricas y datos preparados para analítica.
-
-- Crear dashboards para visualizar el estado de la red de transporte.
-
-- Aplicar buenas prácticas de desarrollo, testing y CI/CD.
-
-- Diseñar una arquitectura preparada para su despliegue en cloud.
+- Integrar datos GTFS y GTFS-Realtime.
+- Construir pipelines batch automatizados.
+- Procesar eventos de transporte en tiempo real.
+- Utilizar Apache Kafka como sistema de streaming.
+- Utilizar Apache Spark para procesamiento distribuido.
+- Construir un Data Lake basado en MinIO/S3.
+- Construir un Data Warehouse en PostgreSQL.
+- Implementar un modelo dimensional Star Schema.
+- Aplicar controles de Data Quality.
+- Orquestar procesos mediante Apache Airflow.
+- Crear analítica y dashboards con Metabase.
+- Implementar un agente de IA con LangGraph.
+- Utilizar Ollama como LLM local.
+- Integrar observabilidad y trazabilidad mediante LangSmith.
+- Exponer el agente mediante un endpoint público protegido por Cloudflare Tunnel.
+- Automatizar comprobaciones mediante GitHub Actions.
+- Mantener una arquitectura preparada para una futura migración a AWS.
 
 ---
 
 # 🏗️ Arquitectura
 
-UrbanFlow está compuesto por dos pipelines principales:
-
-### Pipeline Batch
-
-Procesa información histórica procedente de archivos y APIs.
+UrbanFlow está compuesto por cuatro bloques principales:
 
 ```text
-
-┌─────────────────────┐
-
-│ CSV / GTFS / APIs   │
-
-└──────────┬──────────┘
-
-           │
-
-           ▼
-
-┌─────────────────────┐
-
-│      Python         │
-
-│     Ingestion       │
-
-└──────────┬──────────┘
-
-           │
-
-           ▼
-
-┌─────────────────────┐
-
-│     Data Lake       │
-
-│      Raw Zone       │
-
-└──────────┬──────────┘
-
-           │
-
-           ▼
-
-┌─────────────────────┐
-
-│      Apache         │
-
-│       Spark         │
-
-│   Transformations   │
-
-└──────────┬──────────┘
-
-           │
-
-           ▼
-
-┌─────────────────────┐
-
-│    Data Quality     │
-
-└──────────┬──────────┘
-
-           │
-
-           ▼
-
-┌─────────────────────┐
-
-│   Data Warehouse    │
-
-│     PostgreSQL      │
-
-└─────────────────────┘
-
-```
-
-### Pipeline Streaming
-
-Procesa eventos de transporte prácticamente en tiempo real.
-
-```text
-
-                    ┌──────────────────┐
-
-                    │  API / Generador │
-
-                    │     de eventos   │
-
-                    └────────┬─────────┘
-
-                             │
-
-                             ▼
-
-                    ┌──────────────────┐
-
-                    │ Python Producer   │
-
-                    └────────┬─────────┘
-
-                             │
-
-                             ▼
-
-                    ┌──────────────────┐
-
-                    │      Kafka       │
-
-                    │                  │
-
-                    │  gtfs-realtime   │
-
-                    └────────┬─────────┘
-
-                             │
-
-                             ▼
-
-                    ┌──────────────────┐
-
-                    │      Spark       │
-
-                    │    Streaming     │
-
-                    └────────┬─────────┘
-
-                             │
-
-                    ┌────────┴─────────┐
-
-                    ▼                  ▼
-
-              ┌───────────┐      ┌────────────┐
-
-              │  MinIO /  │      │ PostgreSQL │
-
-              │    S3     │      │            │
-
-              └───────────┘      └─────┬──────┘
-
-                                       │
-
-                                       ▼
-
-                                ┌─────────────┐
-
-                                │  Metabase   │
-
-                                └─────────────┘
-
+                         ┌──────────────────────┐
+                         │       TMB API        │
+                         │   GTFS / GTFS-RT     │
+                         └──────────┬───────────┘
+                                    │
+                     ┌──────────────┴──────────────┐
+                     │                             │
+                     ▼                             ▼
+              ┌─────────────┐              ┌─────────────┐
+              │    BATCH    │              │  STREAMING  │
+              │   Python    │              │   Python    │
+              └──────┬──────┘              └──────┬──────┘
+                     │                            │
+                     ▼                            ▼
+              ┌─────────────┐              ┌─────────────┐
+              │    MinIO    │              │    Kafka    │
+              │  Data Lake  │              └──────┬──────┘
+              └──────┬──────┘                     │
+                     │                            ▼
+                     ▼                     ┌─────────────┐
+              ┌─────────────┐              │    Spark    │
+              │    Spark    │              │  Streaming  │
+              └──────┬──────┘              └──────┬──────┘
+                     │                            │
+                     └──────────────┬─────────────┘
+                                    │
+                                    ▼
+                            ┌───────────────┐
+                            │  PostgreSQL   │
+                            │ Data Warehouse│
+                            └───────┬───────┘
+                                    │
+                       ┌────────────┴────────────┐
+                       │                         │
+                       ▼                         ▼
+                ┌─────────────┐          ┌─────────────┐
+                │  Metabase   │          │ LangGraph   │
+                │  Analytics  │          │    Agent    │
+                └─────────────┘          └──────┬──────┘
+                                                │
+                                                ▼
+                                         ┌─────────────┐
+                                         │   Ollama    │
+                                         │ llama3.2     │
+                                         └─────────────┘
 ```
 
 ---
 
-# ⚡ Procesamiento en tiempo real
+# 📦 Pipeline Batch
 
-UrbanFlow implementa un pipeline de llegadas GTFS-RT en tiempo real mediante la API de TMB.
+El pipeline batch procesa snapshots GTFS de TMB.
 
-El productor consulta la API de TMB y publica eventos normalizados de llegadas de autobuses.
+```text
+TMB GTFS
+   ↓
+Python ingestion
+   ↓
+Raw Data Lake
+   ↓
+Spark transformations
+   ↓
+Data Quality
+   ↓
+Processed Parquet
+   ↓
+MinIO
+   ↓
+PostgreSQL
+   ↓
+Dimensional Model
+   ↓
+Analytics
+```
 
-Ejemplo de evento:
+El DAG principal de Airflow es:
+
+```text
+urbanflow_batch
+```
+
+y ejecuta las diferentes fases del procesamiento:
+
+```text
+download_gtfs
+      ↓
+validate_data
+      ↓
+transform_gtfs
+      ↓
+data_quality
+      ↓
+validate_processed_snapshot
+      ↓
+upload_minio
+      ↓
+load_postgres
+      ↓
+load_dimensional
+```
+
+---
+
+# ⚡ Pipeline Streaming
+
+El pipeline streaming procesa llegadas de autobuses mediante GTFS-Realtime.
+
+```text
+TMB GTFS-RT
+     ↓
+Python Producer
+     ↓
+Apache Kafka
+     ↓
+Spark Structured Streaming
+     ↓
+Validation
+     ↓
+Transformation
+     ↓
+PostgreSQL
+     ↓
+Metabase / Analytics
+```
+
+El Producer normaliza los eventos antes de publicarlos en Kafka.
+
+Ejemplo:
 
 ```json
 {
@@ -217,772 +179,624 @@ Ejemplo de evento:
 }
 ```
 
-El evento sigue el siguiente recorrido:
-
-```text
-
-Fuente de datos
-
-      ↓
-
-Python Producer
-
-      ↓
-
-Apache Kafka
-
-      ↓
-
-Spark Structured Streaming
-
-      ↓
-
-Validación
-
-      ↓
-
-Transformación
-
-      ↓
-
-Almacenamiento
-
-      ↓
-
-Analytics
-
-```
-
-Kafka actúa como sistema de transmisión y distribución de eventos, mientras que Spark Structured Streaming se encarga de procesarlos a medida que llegan.
-
----
-
-# 📡 Fuentes de datos
-
-UrbanFlow está diseñado para poder trabajar con diferentes fuentes:
-
-- APIs REST.
-
-- GTFS.
-
-- GTFS-Realtime.
-
-- Archivos CSV.
-
-- Datos históricos.
-
-- Generador de eventos para pruebas y desarrollo.
-
-El generador de eventos permite mantener el sistema funcionando incluso cuando una fuente externa no está disponible.
-
-De esta forma, el pipeline puede probarse completamente de manera local.
-
----
-
-# 🚌 Modelo de datos
-
-Los eventos streaming representan llegadas estimadas de autobuses de TMB.
-
-Los principales atributos son:
-
-| Campo | Descripción |
-
-|---|---|
-
-| `timestamp` | Timestamp Unix del evento |
-
-| `destination` | Destino anunciado |
-
-| `line` | Línea de transporte |
-
-| `route_id` | Identificador de ruta GTFS |
-
-| `stop` | Identificador de parada recibido de TMB |
-
-| `time_in_minutes` | Minutos estimados hasta la llegada |
-
-| `time_in_seconds` | Segundos estimados hasta la llegada |
-
-| `text_ca` | Texto original de llegada |
-
 ---
 
 # 📨 Apache Kafka
 
-Kafka se utiliza como plataforma de transmisión de eventos.
+Kafka actúa como sistema de mensajería y distribución de eventos.
 
-## Topics principales
+## `gtfs-realtime`
 
-### `gtfs-realtime`
-
-Topic principal donde se publican las llegadas de autobuses normalizadas desde TMB.
+Topic principal de llegadas de autobuses.
 
 ```text
-
 Python Producer
-
-      │
-
-      ▼
-
+      ↓
 gtfs-realtime
-
-      │
-
-      ▼
-
-Spark Streaming
-
+      ↓
+Spark Structured Streaming
 ```
 
-### `transport-alerts`
+## `transport-alerts`
 
-Topic destinado a eventos que cumplen determinadas condiciones de alerta.
+Topic utilizado para eventos que cumplen reglas de alerta.
 
 Por ejemplo:
 
 ```text
-
 time_in_seconds > 600
-
 ```
 
-Los eventos rechazados se publican en `transport-errors` con el motivo y el evento original.
+genera una alerta:
 
-### `transport-errors`
+```text
+critical_arrival_wait
+```
 
-Topic utilizado para eventos que no superan las validaciones.
+con severidad:
+
+```text
+critical
+```
+
+## `transport-errors`
+
+Topic utilizado para eventos rechazados por errores de validación.
+
+Esto permite separar:
+
+```text
+Eventos válidos
+      ↓
+Pipeline principal
+
+Eventos inválidos
+      ↓
+transport-errors
+```
 
 ---
 
-# 🔥 Procesamiento con Apache Spark
+# 🔥 Apache Spark
 
-Spark Structured Streaming consume los eventos publicados en Kafka.
+Spark se utiliza tanto en procesamiento batch como streaming.
 
-El pipeline realiza:
+## Batch
 
-1. Lectura de eventos.
+Se utiliza para:
 
-2. Parseo del JSON.
+- Lectura de datasets GTFS.
+- Transformación.
+- Limpieza.
+- Normalización.
+- Validación.
+- Generación de datasets procesados.
+- Escritura en Parquet.
 
-3. Aplicación del esquema.
+## Streaming
 
-4. Validación.
+Spark Structured Streaming consume eventos desde Kafka y realiza:
 
-5. Limpieza.
-
-6. Transformación.
-
-7. Cálculo de métricas.
-
-8. Detección de anomalías.
-
-9. Persistencia de resultados.
-
-Entre las métricas calculadas se encuentran:
-
-- Retraso medio.
-
-- Retraso máximo.
-
-- Ocupación media.
-
-- Número de vehículos activos.
-
-- Número de eventos procesados.
-
-- Eventos por minuto.
-
-- Número de incidencias.
-
-- Líneas con mayor retraso.
-
----
-
-# 🚨 Sistema de alertas
-
-UrbanFlow incorpora reglas para detectar situaciones anómalas.
-
-## Espera de llegada crítica
-
-```text
-
-time_in_seconds > 600
-
-```
-
-Genera una alerta `critical_arrival_wait` de severidad `critical`.
-
-Las reglas de ocupación y retraso histórico quedan fuera del contrato actual porque el productor de TMB no proporciona esos campos.
-
-Las alertas se envían a:
-
-```text
-
-transport-alerts
-
-```
+- Parseo JSON.
+- Aplicación de esquemas.
+- Validación.
+- Transformación.
+- Cálculo de métricas.
+- Detección de eventos relevantes.
+- Persistencia en PostgreSQL.
 
 ---
 
 # 🪣 Data Lake
 
-Para el almacenamiento de datos se utiliza **MinIO** durante el desarrollo local.
+MinIO proporciona el almacenamiento de objetos utilizado durante el desarrollo local.
 
-MinIO proporciona almacenamiento compatible con el modelo de objetos de Amazon S3.
-
-La estructura del Data Lake será:
+La arquitectura es compatible conceptualmente con Amazon S3.
 
 ```text
-
 urbanflow-data/
 
 ├── raw/
-
 │   └── transport/
-
 │       └── year=2026/
-
 │           └── month=09/
-
 │               └── day=10/
-
 │
-
 ├── processed/
-
 │   └── transport/
-
 │       └── year=2026/
-
 │           └── month=09/
-
 │               └── day=10/
-
 │
-
 ├── curated/
-
 │
-
 └── errors/
-
 ```
 
-Los datos procesados se almacenarán preferentemente en formato **Parquet**.
+Los datasets procesados utilizan principalmente formato:
+
+```text
+Parquet
+```
+
+Los snapshots se particionan por:
+
+```text
+year / month / day
+```
 
 ---
 
-# 🧹 Calidad de datos
+# 🧹 Data Quality
 
-La plataforma incorpora diferentes controles de calidad.
+UrbanFlow incorpora controles de calidad en diferentes fases del pipeline.
 
-### Identificadores
+Entre ellos:
+
+- Validación de identificadores.
+- Validación de timestamps.
+- Validación de coordenadas.
+- Validación de referencias entre datasets.
+- Detección de duplicados.
+- Detección de valores nulos.
+- Validación de rangos.
+- Validación de snapshots procesados.
+- Separación de eventos inválidos.
+
+En GTFS se comprueban, entre otras relaciones:
 
 ```text
+trips.route_id → routes.route_id
 
-timestamp, line, route_id y stop son obligatorios
+stop_times.stop_id → stops.stop_id
 
+stop_times.trip_id → trips.trip_id
 ```
-
-### Tiempos de llegada
-
-```text
-
-time_in_minutes >= 0
-
-time_in_seconds >= 0
-
-```
-
-### Timestamp
-
-Los timestamps deben cumplir el formato esperado y representar fechas válidas.
 
 ---
 
 # 🏢 Data Warehouse
 
-Los datos preparados se almacenan en PostgreSQL utilizando un modelo dimensional.
-
-UrbanFlow utiliza un **Star Schema**.
+Los datos históricos se almacenan en PostgreSQL mediante un **Star Schema**.
 
 ```text
-
-                  dim_route       dim_service       dim_stop
-                      \              |              /
-                       \             |             /
-                        └──────── fact_trip ──────┘
-                                    |
-                              fact_stop_time
-
+                    dim_route
+                        │
+                        │
+dim_service ─────── fact_trip ─────── dim_stop
+                        │
+                        │
+                  fact_stop_time
 ```
 
 ## Dimensiones
 
-- `dim_route`
-- `dim_stop`
-- `dim_service`
+```text
+dim_route
+dim_stop
+dim_service
+```
 
-## Tablas de hechos
+## Hechos
 
-- `fact_trip`
-- `fact_stop_time`
+```text
+fact_trip
+fact_stop_time
+```
 
-El grain de `fact_trip` es un registro por viaje y snapshot. El grain de `fact_stop_time` es un registro por parada de un viaje y snapshot.
+Las tablas utilizan surrogate keys para establecer las relaciones dimensionales.
 
-Las tablas dimensionales usan surrogate keys y las facts se relacionan mediante `route_key`, `service_key`, `trip_key` y `stop_key`.
+El grain de `fact_trip` es un registro por viaje y snapshot.
+
+El grain de `fact_stop_time` es un registro por parada de un viaje y snapshot.
 
 ---
 
 # 📊 Analytics
 
-El Data Warehouse permitirá realizar consultas analíticas como:
+El Data Warehouse permite realizar consultas analíticas sobre:
 
-### Viajes por tipo de transporte
+- Viajes.
+- Rutas.
+- Paradas.
+- Tipos de transporte.
+- Servicios.
+- Evolución temporal.
+- Llegadas en tiempo real.
 
-```sql
-
-SELECT
-
-      r.route_type,
-      COUNT(f.trip_key) AS total_viajes
-
-FROM fact_trip f
-
-JOIN dim_route r ON f.route_key = r.route_key
-
-GROUP BY r.route_type
-ORDER BY total_viajes DESC;
-
-```
-
-### Top de rutas por viajes
+Ejemplo:
 
 ```sql
-
 SELECT
-
-      r.route_short_name,
-      COUNT(f.trip_key) AS total_viajes
-
+    r.route_short_name,
+    COUNT(f.trip_key) AS total_viajes
 FROM fact_trip f
-
-JOIN dim_route r ON f.route_key = r.route_key
-
+JOIN dim_route r
+    ON f.route_key = r.route_key
 GROUP BY r.route_key, r.route_short_name
 ORDER BY total_viajes DESC
 LIMIT 10;
-
 ```
 
-### Top de paradas por pasos de viajes
+---
 
-```sql
+# 📈 Metabase
 
-SELECT
+Metabase se utiliza como capa de visualización.
 
-      s.stop_name,
-      COUNT(*) AS total_pasos
+El dashboard incluye información histórica y realtime.
 
-FROM fact_stop_time f
+Principales indicadores:
 
-JOIN dim_stop s ON f.stop_key = s.stop_key
-
-GROUP BY s.stop_key, s.stop_name
-ORDER BY total_pasos DESC
-LIMIT 10;
-
+```text
+Total de viajes
+Total de rutas
+Total de paradas
+Viajes por tipo de transporte
+Top de rutas
+Top de paradas
+Llegadas GTFS-RT
+Llegadas por línea
+Últimas llegadas
 ```
 
 ---
 
 # ⏰ Apache Airflow
 
-Airflow será utilizado para la orquestación de los procesos batch.
+Airflow se utiliza como sistema de orquestación del pipeline batch.
 
-El DAG implementado se llama `urbanflow_batch` y ejecuta:
+Actualmente el entorno incluye:
 
 ```text
-
-download_gtfs
-
-      ↓
-
-validate_data
-
-      ↓
-
-transform_gtfs
-
-      ↓
-
-data_quality
-
-      ↓
-
-validate_processed_snapshot
-
-      ↓
-
-upload_minio
-
-      ↓
-
-load_postgres
-
-      ↓
-
-load_dimensional
-
+Airflow API Server
+Airflow Scheduler
+Airflow DAG Processor
+Airflow Triggerer
+Airflow PostgreSQL
 ```
 
-Airflow proporciona:
+Airflow permite:
 
-- Lanzar manualmente el DAG (`schedule=None`).
-
+- Ejecutar DAGs.
 - Gestionar dependencias.
-
-- Reintentar tareas fallidas.
-
+- Reintentar tareas.
 - Registrar logs.
+- Monitorizar ejecuciones.
+- Automatizar el pipeline batch.
 
-- Monitorizar pipelines.
+El streaming funciona independientemente del DAG batch.
 
-- Automatizar procesos ETL.
+---
 
-El procesamiento streaming mediante Kafka funcionará de manera independiente del DAG batch.
+# 🤖 Agente de IA con LangGraph
+
+UrbanFlow incorpora un agente de IA basado en **LangGraph**.
+
+El agente permite consultar información real de UrbanFlow utilizando PostgreSQL como fuente de datos.
+
+Arquitectura:
+
+```text
+LangSmith Studio
+       │
+       ▼
+LangGraph Agent Server
+       │
+       ▼
+UrbanFlow Agent
+       │
+       ├──────────────► PostgreSQL
+       │
+       ▼
+     Ollama
+       │
+       ▼
+   llama3.2
+```
+
+El agente utiliza:
+
+- LangGraph.
+- LangGraph Agent Server.
+- Ollama.
+- PostgreSQL.
+- SQL read-only.
+- Persistencia mediante `thread_id`.
+- Guardrails.
+- LangSmith Studio.
+
+El modelo utilizado actualmente es:
+
+```text
+llama3.2
+```
+
+---
+
+# 🧠 Ollama
+
+Ollama se ejecuta **nativamente en macOS**, fuera de Docker.
+
+El agente Docker se conecta al servicio mediante:
+
+```text
+http://host.docker.internal:11434
+```
+
+Variable de configuración:
+
+```text
+OLLAMA_MODEL=llama3.2
+```
+
+Esto permite mantener el modelo local y evitar depender de una API externa para las inferencias.
+
+---
+
+# 🔐 Seguridad del agente
+
+El agente está diseñado para realizar consultas de solo lectura.
+
+Se aplican controles para evitar:
+
+- `INSERT`
+- `UPDATE`
+- `DELETE`
+- `DROP`
+- múltiples sentencias SQL
+- comentarios SQL maliciosos
+- acceso a tablas inexistentes
+
+Las respuestas se basan en:
+
+1. El contexto disponible.
+2. El esquema real de UrbanFlow.
+3. Los resultados obtenidos mediante las herramientas permitidas.
+
+---
+
+# 🔭 LangSmith
+
+LangSmith se utiliza para trabajar con el agente mediante Studio y para observar las ejecuciones.
+
+La arquitectura actual permite utilizar:
+
+```text
+LangSmith Studio
+       ↓
+Public Agent URL
+       ↓
+Cloudflare Tunnel
+       ↓
+LangGraph Server
+       ↓
+UrbanFlow Agent
+```
+
+El endpoint público actual es:
+
+```text
+https://urbanflow.controlall.es
+```
+
+Health check:
+
+```text
+GET /ok
+```
+
+El endpoint devuelve:
+
+```json
+{
+  "ok": true
+}
+```
+
+---
+
+# ☁️ Cloudflare Tunnel
+
+El servidor LangGraph local se expone mediante Cloudflare Tunnel.
+
+```text
+Internet
+   ↓
+urbanflow.controlall.es
+   ↓
+Cloudflare
+   ↓
+Cloudflare Tunnel
+   ↓
+localhost:2024
+   ↓
+LangGraph Agent Server
+```
+
+El túnel permite utilizar el agente desde LangSmith sin desplegar todavía toda la plataforma en AWS.
 
 ---
 
 # 🐳 Docker
 
-Todos los componentes principales del proyecto estarán disponibles mediante Docker.
+La infraestructura principal se ejecuta mediante Docker Compose.
 
-El objetivo es poder iniciar el entorno completo con:
+Servicios principales:
+
+```text
+urbanflow-agent
+urbanflow-airflow-apiserver
+urbanflow-airflow-dag-processor
+urbanflow-airflow-postgres
+urbanflow-airflow-scheduler
+urbanflow-airflow-triggerer
+urbanflow-kafka
+urbanflow-metabase
+urbanflow-metabase-postgres
+urbanflow-minio
+urbanflow-postgres
+urbanflow-producer
+urbanflow-spark-streaming
+```
+
+El entorno puede iniciarse con:
 
 ```bash
-
 docker compose up -d
-
 ```
 
-Servicios disponibles:
+Comprobar servicios:
 
-```text
-
-├── urbanflow-producer
-
-├── kafka
-
-├── spark-streaming
-
-├── postgres
-
-├── minio
-
-├── airflow-apiserver
-
-├── airflow-scheduler
-
-├── airflow-dag-processor
-
-├── airflow-triggerer
-
-└── metabase
-
-```
-
-Esto permite reproducir el entorno de desarrollo sin necesidad de instalar manualmente cada tecnología.
-
----
-
-# 📈 Dashboard
-
-Los datos almacenados en el Data Warehouse serán utilizados para crear un dashboard de movilidad urbana.
-
-## UrbanFlow Barcelona — Public Transport Analytics
-
-Principales KPIs:
-
-```text
-
-Total de viajes
-
-Total de rutas y paradas
-
-Viajes por tipo de transporte
-
-Top de rutas y paradas
-
-Llegadas GTFS-RT registradas
-
-```
-
-Tarjetas disponibles en Metabase:
-
-- Viajes por tipo de transporte.
-- Top 10 líneas por número de viajes.
-- Total de viajes.
-- Total de paradas.
-- Total de líneas.
-- Top 10 paradas.
-- Llegadas en tiempo real por línea.
-- Últimas llegadas en tiempo real.
-- Total de llegadas en tiempo real.
-
----
-
-# 🧪 Testing
-
-El proyecto contará con tests automatizados mediante `pytest`.
-
-Se probarán principalmente:
-
-```text
-
-✓ Ingestión de datos
-
-✓ Validación de eventos
-
-✓ Transformaciones
-
-✓ Reglas de calidad
-
-✓ Detección de duplicados
-
-✓ Procesamiento de eventos
-
-✓ Reglas de alertas
-
-```
-
-Ejemplos de casos:
-
-```text
-
-✓ Evento válido aceptado
-
-✓ Coordenadas inválidas rechazadas
-
-✓ Ocupación superior a 100% rechazada
-
-✓ Retraso negativo rechazado
-
-✓ Eventos duplicados detectados
-
-✓ Eventos incompletos rechazados
-
+```bash
+docker compose ps
 ```
 
 ---
 
-# 🔄 CI/CD
+# 🧪 Testing y calidad
 
-El proyecto utilizará GitHub Actions para automatizar las comprobaciones del código.
+El proyecto utiliza:
 
-Pipeline:
+- Pytest.
+- Ruff.
+- Mypy.
+- Python compile checks.
+- Docker Compose validation.
+- Docker image builds.
+
+Las comprobaciones principales del CI incluyen:
 
 ```text
-
-Git Push
-
-   │
-
-   ▼
-
-GitHub Actions
-
-   │
-
-   ├── Tests
-
-   ├── Lint
-
-   ├── Type checking
-
-   └── Docker Build
-
+Python compilation
+      ↓
+Ruff
+      ↓
+Mypy
+      ↓
+Docker Compose validation
+      ↓
+Docker image build
 ```
 
-El objetivo es garantizar que los cambios introducidos en el repositorio no rompan los componentes existentes.
+El repositorio incluye un `.env.example` con valores de prueba para que GitHub Actions pueda validar Docker Compose sin exponer las credenciales reales del entorno local.
+
+El archivo real:
+
+```text
+.env
+```
+
+permanece fuera del repositorio.
 
 ---
 
-# ☁️ Arquitectura Cloud
+# 🔄 GitHub Actions
 
-Una vez finalizada la arquitectura local, se diseñará una versión orientada a AWS.
+UrbanFlow utiliza GitHub Actions para ejecutar automáticamente las comprobaciones del proyecto.
 
-Arquitectura prevista:
+El workflow se ejecuta sobre cambios del repositorio y comprueba:
 
 ```text
-
-                     ┌──────────────┐
-
-                     │     API      │
-
-                     └──────┬───────┘
-
-                            │
-
-                            ▼
-
-                     ┌──────────────┐
-
-                     │ Kinesis / MSK│
-
-                     └──────┬───────┘
-
-                            │
-
-                            ▼
-
-                     ┌──────────────┐
-
-                     │   Amazon S3  │
-
-                     └──────┬───────┘
-
-                            │
-
-                            ▼
-
-                     ┌──────────────┐
-
-                     │ AWS Glue     │
-
-                     └──────┬───────┘
-
-                            │
-
-                            ▼
-
-                     ┌──────────────┐
-
-                     │  Redshift    │
-
-                     └──────┬───────┘
-
-                            │
-
-                            ▼
-
-                     ┌──────────────┐
-
-                     │  Analytics   │
-
-                     └──────────────┘
-
+✓ Python
+✓ Ruff
+✓ Mypy
+✓ Docker Compose
+✓ Docker build
 ```
 
-La arquitectura local con MinIO permitirá trabajar con una aproximación compatible con S3 antes de realizar el despliegue en AWS.
+El entorno CI genera automáticamente un `.env` temporal a partir de:
+
+```text
+.env.example
+```
+
+Esto evita almacenar secretos reales en GitHub.
 
 ---
 
-# 🛠️ Tecnologías
+# 📡 Fuentes de datos
 
-## Lenguajes
+UrbanFlow trabaja principalmente con datos de TMB:
 
-- Python
+### GTFS
 
-- SQL
+Información estática de:
 
-## Data Engineering
+- Agencias.
+- Rutas.
+- Viajes.
+- Paradas.
+- Stop times.
+- Calendarios.
 
-- Apache Kafka
+### GTFS-Realtime
 
-- Apache Spark
+Información dinámica de:
 
-- Spark Structured Streaming
+- Llegadas estimadas.
+- Líneas.
+- Rutas.
+- Paradas.
+- Destinos.
+- Tiempos estimados.
 
-- Apache Airflow
+---
 
-- ETL / ELT
+# 📊 Análisis GTFS
 
-- Data Lake
+El análisis exploratorio del feed GTFS de TMB se encuentra en:
 
-- Data Warehouse
+```text
+notebooks/gtfs_analysis.ipynb
+```
 
-- Dimensional Modeling
+La extracción analizada contiene:
 
-## Bases de datos
+| Dataset | Registros |
+|---|---:|
+| `agency` | 1 |
+| `routes` | 116 |
+| `trips` | 60.537 |
+| `stops` | 3.445 |
+| `stop_times` | 1.391.617 |
+| `calendar` | 4 |
 
-- PostgreSQL
-
-- SQL
-
-## Almacenamiento
-
-- MinIO
-
-- Amazon S3
-
-## Cloud
-
-- AWS
-
-- Amazon S3
-
-- AWS Glue
-
-- Amazon Redshift
-
-- Kinesis / Amazon MSK
-
-## DevOps
-
-- Docker
-
-- Docker Compose
-
-- Git
-
-- GitHub Actions
-
-## Testing y calidad
-
-- Pytest
-
-- Ruff
-
-- Mypy
-
-## Analytics
-
-- Metabase
+El análisis también comprueba integridad referencial, duplicados, valores nulos y consistencia de los datasets.
 
 ---
 
 # 📁 Estructura del proyecto
 
 ```text
-
-urbanflow/
-
-├── dags/urbanflow_batch.py
+UrbanFlow/
+│
+├── agent/
+│   ├── graph.py
+│   └── ...
+│
+├── dags/
+│   └── urbanflow_batch.py
+│
 ├── ingestion/
+│
 ├── processing/
+│
 ├── streaming/
+│
 ├── utils/
+│
 ├── sql/
 │   ├── schema.sql
 │   ├── dimensional_schema.sql
 │   ├── analytics.sql
 │   ├── dimensional_analytics.sql
 │   └── metabase_dashboard.sql
+│
 ├── tests/
-├── notebooks/gtfs_analysis.ipynb
-├── data/raw/tmb/
-├── data/processed/tmb/
+│
+├── notebooks/
+│   └── gtfs_analysis.ipynb
+│
+├── docs/
+│   ├── agent.md
+│   ├── arquitecture.md
+│   ├── data-pipelines.md
+│   └── installation.md
+│
+├── data/
+│   ├── raw/
+│   └── processed/
+│
 ├── docker-compose.yml
 ├── Dockerfile
-├── airflow/Dockerfile
-├── streaming/Dockerfile.producer
-├── streaming/Dockerfile.spark
+├── langgraph.json
 ├── requirements.txt
 ├── pytest.ini
-└── .github/workflows/ci.yml
-
+├── .env.example
+└── .github/
+    └── workflows/
+        └── ci.yml
 ```
 
 ---
@@ -991,389 +805,264 @@ urbanflow/
 
 ## Requisitos
 
-Antes de comenzar se recomienda tener instalado:
+- Docker.
+- Docker Compose.
+- Git.
+- Python 3.12+.
+- Ollama si se quiere utilizar el agente localmente.
 
-- Docker
-
-- Docker Compose
-
-- Git
-
-- Python 3.12 o superior
-
-No es necesario instalar Kafka, Spark, PostgreSQL, Airflow o MinIO directamente en el sistema, ya que se ejecutarán mediante Docker.
+No es necesario instalar directamente Kafka, Spark, PostgreSQL, Airflow, MinIO o Metabase.
 
 ---
 
 ## 1. Clonar el repositorio
 
 ```bash
+git clone https://github.com/yagoalonsodev/UrbanFlow-.git
 
-git clone [https://github.com/yagoalonsodev/urbanflow.git](https://github.com/yagoalonsodev/urbanflow.git)
-
-cd urbanflow
-
-```
-
-## 2. Crear variables de entorno
-
-```bash
-
-touch .env
-
-```
-
-Configurar en `.env` las credenciales de TMB, PostgreSQL, MinIO y las variables de conexión usadas por Docker Compose.
-
-## 3. Iniciar los servicios
-
-```bash
-
-docker compose up -d
-
-```
-
-## 4. Comprobar los contenedores
-
-```bash
-
-docker compose ps
-
-```
-
-## 5. Consultar los logs
-
-```bash
-
-docker compose logs -f
-
+cd UrbanFlow-
 ```
 
 ---
 
-# ⚡ Ejecución del pipeline en tiempo real
+## 2. Crear el entorno virtual
 
-Una vez iniciados los servicios:
+```bash
+python3 -m venv .venv
+
+source .venv/bin/activate
+```
+
+---
+
+## 3. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 4. Crear `.env`
+
+```bash
+cp .env.example .env
+```
+
+Editar `.env` y añadir las credenciales reales de TMB y las variables necesarias para el entorno local.
+
+**Nunca subir `.env` al repositorio.**
+
+---
+
+## 5. Iniciar UrbanFlow
+
+```bash
+docker compose up -d
+```
+
+Comprobar:
+
+```bash
+docker compose ps
+```
+
+---
+
+# 🤖 Ejecutar el agente
+
+Ollama debe estar ejecutándose de forma nativa en macOS.
+
+Comprobar el modelo:
+
+```bash
+curl -s http://localhost:11434/api/tags
+```
+
+El modelo utilizado actualmente es:
 
 ```text
-
-1. El Producer obtiene/genera eventos
-
-                 ↓
-
-2. Publica eventos en Kafka
-
-                 ↓
-
-3. Kafka almacena y distribuye los eventos
-
-                 ↓
-
-4. Spark Structured Streaming los consume
-
-                 ↓
-
-5. Se validan y transforman
-
-                 ↓
-
-6. Los datos se almacenan
-
-                 ↓
-
-7. PostgreSQL recibe las métricas
-
-                 ↓
-
-8. Metabase muestra los resultados
-
+llama3.2
 ```
 
-El sistema deberá poder mantenerse funcionando continuamente y procesar nuevos eventos sin necesidad de ejecutar manualmente el pipeline completo.
-
----
-
-# 🤖 Agente LangGraph
-
-UrbanFlow incluye un agente LangGraph en `agent/graph.py` para consultar el estado histórico y realtime de PostgreSQL.
-
-El grafo usa:
-
-- Ollama local, configurable con `OLLAMA_MODEL`.
-- Persistencia nativa de LangGraph Dev por `thread_id`.
-- Contexto vivo del esquema, snapshot más reciente y volumen realtime en cada ejecución.
-- Herramienta SQL de solo lectura sobre las tablas reales de UrbanFlow.
-- Guardrails contra escritura SQL, múltiples sentencias, comentarios y tablas inexistentes.
-
-## Arrancar LangGraph Dev
-
-Primero inicia Ollama y descarga el modelo elegido:
-
-```bash
-ollama serve
-ollama pull llama3.2
-```
-
-En otra terminal, desde la raíz del proyecto:
-
-```bash
-export OLLAMA_MODEL=llama3.2
-export AGENT_DATABASE_URL=postgresql+psycopg2://urbanflow:urbanflow123@localhost:5432/urbanflow
-.venv/bin/langgraph dev --host 127.0.0.1 --port 2024
-```
-
-Después estarán disponibles la API en `http://127.0.0.1:2024` y la documentación en `http://127.0.0.1:2024/docs`.
-
-Cada conversación debe usar un `thread_id` estable para conservar el historial. El agente solo puede fundamentar respuestas en el contexto recibido o en resultados de consultas PostgreSQL permitidas.
-
-## Ejecutar el agente dentro de Docker
-
-El agente y Ollama están definidos en el perfil opcional `agent`. No se inician con el `docker compose up` normal.
-
-Para usar DeepSeek Coder dentro de Docker:
-
-```bash
-export OLLAMA_MODEL=deepseek-coder:6.7b
-docker compose --profile agent up -d ollama ollama-init urbanflow-agent
-```
-
-La primera ejecución puede tardar porque descarga el modelo. Las siguientes reutilizan el volumen `ollama_data`. La API queda disponible desde fuera en:
+El Agent Server está disponible localmente en:
 
 ```text
 http://localhost:2024
 ```
 
-Para detener solo el agente:
+Health check:
 
 ```bash
-docker compose --profile agent stop urbanflow-agent ollama ollama-init
+curl http://localhost:2024/ok
 ```
 
 ---
 
-# 📌 Estado y roadmap
+# 🌐 LangSmith
 
-El estado actual incluye ingestion GTFS, transformación Spark a Parquet, validaciones de calidad, carga en MinIO y PostgreSQL, modelo dimensional, streaming GTFS-RT estable, alertas, errores, métricas realtime, dashboard Metabase, CI, Ruff y Mypy.
+El agente puede utilizarse desde LangSmith Studio mediante:
 
-## Fase 1 — Preparación
+```text
+https://urbanflow.controlall.es
+```
 
-- [ ] Crear estructura del proyecto.
-
-- [ ] Configurar Git.
-
-- [ ] Configurar Docker.
-
-- [ ] Crear documentación inicial.
-
-## Fase 2 — Ingestion
-
-- [x] Implementar Producer Python.
-
-- [x] Integrar API/GTFS.
-
-- [ ] Crear generador de eventos.
-
-- [x] Implementar validación inicial.
-
-- [ ] Añadir logging.
-
-## Fase 3 — Kafka
-
-- [x] Configurar Kafka.
-
-- [ ] Crear topics.
-
-- [x] Implementar Producer.
-
-- [ ] Implementar Consumer.
-
-- [ ] Configurar Consumer Groups.
-
-- [x] Gestionar errores.
-
-## Fase 4 — Streaming
-
-- [x] Configurar Spark.
-
-- [x] Implementar Structured Streaming.
-
-- [x] Consumir eventos Kafka.
-
-- [x] Transformar eventos.
-
-- [x] Calcular métricas.
-
-- [ ] Implementar detección de anomalías.
-
-## Fase 5 — Data Lake
-
-- [x] Configurar MinIO.
-
-- [x] Crear Raw Zone.
-
-- [x] Crear Processed Zone.
-
-- [ ] Crear Curated Zone.
-
-- [x] Implementar almacenamiento Parquet.
-
-- [x] Particionar datos por fecha.
-
-## Fase 6 — Data Warehouse
-
-- [x] Diseñar modelo dimensional.
-
-- [x] Crear dimensiones.
-
-- [x] Crear tablas de hechos.
-
-- [x] Implementar procesos de carga.
-
-- [x] Crear consultas analíticas.
-
-- [ ] Optimizar consultas.
-
-## Fase 7 — Data Quality
-
-- [x] Implementar validaciones.
-
-- [x] Detectar duplicados.
-
-- [x] Detectar valores NULL.
-
-- [x] Validar rangos.
-
-- [x] Crear informes de calidad.
-
-- [x] Gestionar datos rechazados.
-
-## Fase 8 — Airflow
-
-- [ ] Configurar Airflow.
-
-- [x] Crear DAG.
-
-- [x] Automatizar ingestion.
-
-- [x] Automatizar transformaciones.
-
-- [x] Automatizar data quality.
-
-- [x] Automatizar carga del DWH.
-
-## Fase 9 — Analytics
-
-- [x] Configurar Metabase.
-
-- [x] Crear KPIs.
-
-- [x] Crear gráficos.
-
-- [x] Crear dashboard.
-
-- [ ] Analizar tendencias.
-
-## Fase 10 — Testing
-
-- [x] Tests unitarios.
-
-- [x] Tests de integración.
-
-- [x] Tests de calidad de datos.
-
-- [x] Tests del Producer.
-
-- [x] Tests del procesamiento.
-
-## Fase 11 — CI/CD
-
-- [x] GitHub Actions.
-
-- [x] Ejecutar tests automáticamente.
-
-- [x] Lint.
-
-- [x] Type checking.
-
-- [x] Docker build.
-
-## Fase 12 — Cloud
-
-- [ ] Diseñar arquitectura AWS.
-
-- [ ] Migrar Data Lake a S3.
-
-- [ ] Evaluar AWS Glue.
-
-- [ ] Evaluar Redshift.
-
-- [ ] Evaluar Kinesis/MSK.
-
-- [ ] Documentar arquitectura cloud.
+La URL pública apunta mediante Cloudflare Tunnel al servidor LangGraph local.
 
 ---
 
-# 📚 Principales conceptos aprendidos
+# 🗺️ Roadmap
 
-Durante el desarrollo del proyecto se trabajarán conceptos fundamentales de ingeniería de datos:
+## Completado
 
-- ETL.
+- [x] Ingestion GTFS.
+- [x] Transformación GTFS.
+- [x] Data Quality.
+- [x] Data Lake con MinIO.
+- [x] Procesamiento Parquet.
+- [x] PostgreSQL.
+- [x] Modelo dimensional.
+- [x] Consultas analíticas.
+- [x] Kafka.
+- [x] Producer GTFS-RT.
+- [x] Spark Structured Streaming.
+- [x] Eventos realtime.
+- [x] Sistema de errores.
+- [x] Sistema de alertas.
+- [x] Métricas realtime.
+- [x] Metabase.
+- [x] Airflow.
+- [x] Tests.
+- [x] Ruff.
+- [x] Mypy.
+- [x] GitHub Actions.
+- [x] Docker Compose.
+- [x] LangGraph.
+- [x] Ollama local.
+- [x] PostgreSQL tools.
+- [x] Guardrails del agente.
+- [x] LangSmith Studio.
+- [x] Cloudflare Tunnel.
+- [x] Endpoint público del agente.
+- [x] Documentación técnica.
 
-- ELT.
+## Próximas fases
 
-- Batch Processing.
+- [ ] Migración del Data Lake a Amazon S3.
+- [ ] Evaluación de AWS Glue.
+- [ ] Evaluación de Redshift.
+- [ ] Evaluación de Kinesis / MSK.
+- [ ] Despliegue cloud completo.
+- [ ] Optimización de costes y recursos.
+- [ ] Release final.
 
-- Stream Processing.
+---
 
-- Event-driven architecture.
+# ☁️ Arquitectura AWS futura
 
-- Message brokers.
+La arquitectura local está preparada conceptualmente para una futura migración:
 
+```text
+TMB API
+   ↓
+Kinesis / MSK
+   ↓
+Amazon S3
+   ↓
+AWS Glue / Spark
+   ↓
+Amazon Redshift
+   ↓
+Analytics
+```
+
+MinIO se utiliza localmente como alternativa compatible con el paradigma de almacenamiento de objetos de S3.
+
+La infraestructura AWS **todavía no forma parte del despliegue actual**.
+
+---
+
+# 🛠️ Tecnologías
+
+### Data Engineering
+
+- Python.
+- SQL.
 - Apache Kafka.
-
-- Producer / Consumer.
-
-- Consumer Groups.
-
+- Apache Spark.
+- Spark Structured Streaming.
+- Apache Airflow.
+- ETL / ELT.
 - Data Lake.
-
 - Data Warehouse.
-
-- Star Schema.
-
 - Dimensional Modeling.
 
-- Data Quality.
+### Storage & Databases
 
-- Data Validation.
-
-- Data Partitioning.
-
+- PostgreSQL.
+- MinIO.
 - Parquet.
+- Amazon S3.
 
-- Apache Spark.
+### AI
 
-- Spark Structured Streaming.
+- LangGraph.
+- LangSmith.
+- Ollama.
+- LLMs.
+- SQL Agent.
+- Guardrails.
 
-- Apache Airflow.
+### Analytics
+
+- Metabase.
+
+### DevOps
 
 - Docker.
+- Docker Compose.
+- Git.
+- GitHub.
+- GitHub Actions.
+- Cloudflare Tunnel.
 
-- CI/CD.
+### Quality
 
-- Cloud Computing.
-
-- AWS.
-
-- SQL Analytics.
+- Pytest.
+- Ruff.
+- Mypy.
 
 ---
 
-# 🎯 Objetivo profesional
+# 🎓 Objetivo profesional
 
-UrbanFlow ha sido diseñado como un proyecto de portfolio para demostrar conocimientos prácticos de **Ingeniería de Datos**, incluyendo el diseño de arquitecturas, integración de fuentes, construcción de pipelines ETL/ELT, procesamiento batch y streaming, almacenamiento de datos, calidad, orquestación, análisis y cloud.
+UrbanFlow ha sido desarrollado como un proyecto de portfolio para demostrar la capacidad de diseñar e implementar una plataforma moderna de **Data Engineering end-to-end**.
 
-El proyecto busca reproducir, a pequeña escala, problemas y arquitecturas habituales en entornos profesionales de datos.
+El proyecto combina:
+
+```text
+Data Ingestion
+      +
+Batch Processing
+      +
+Stream Processing
+      +
+Data Lake
+      +
+Data Warehouse
+      +
+Data Quality
+      +
+Orchestration
+      +
+Analytics
+      +
+CI/CD
+      +
+AI Agent
+```
+
+La arquitectura reproduce, a pequeña escala, componentes y problemas habituales en plataformas profesionales de datos.
 
 ---
 
@@ -1381,87 +1070,24 @@ El proyecto busca reproducir, a pequeña escala, problemas y arquitecturas habit
 
 **Yago Alonso**
 
-Estudiante de Desarrollo de Aplicaciones Multiplataforma (DAM) y desarrollador interesado en **Data Engineering, backend, cloud y sistemas de datos**.
+Data / AI Developer orientado a:
+
+- Data Engineering.
+- Python.
+- Big Data.
+- Cloud.
+- LLMs.
+- AI Agents.
+- Backend.
+
+GitHub:
+
+```text
+https://github.com/yagoalonsodev
+```
 
 ---
 
-## ⭐ Estado del proyecto
+# 📄 Licencia
 
-🚧 **En desarrollo**
-
-El proyecto se desarrollará progresivamente, incorporando cada componente de la arquitectura de forma independiente antes de integrarlo en el pipeline completo.
-
----
-
-## Resultados del análisis GTFS de TMB
-
-El análisis se realizó sobre la extracción `data/raw/tmb/2026-09-10/extracted` y está documentado de forma reproducible en [el notebook de análisis](notebooks/gtfs_analysis.ipynb). Se analizaron `agency.txt`, `routes.txt`, `trips.txt`, `stops.txt`, `stop_times.txt` y `calendar.txt`.
-
-### Volumen del feed
-
-| Dataset      | Registros | Columnas |
-| ------------ | --------: | -------: |
-| `agency`     |         1 |        5 |
-| `routes`     |       116 |        7 |
-| `trips`      |    60.537 |        7 |
-| `stops`      |     3.445 |        9 |
-| `stop_times` | 1.391.617 |        5 |
-| `calendar`   |         4 |       10 |
-
-La agencia es TMB, con zona horaria `Europe/Madrid`. El calendario contiene cuatro servicios: dos laborables y dos de fin de semana, con vigencias entre el 9 de septiembre de 2026 y el 27 de marzo de 2027.
-
-### Oferta de transporte y actividad programada
-
-| `route_type` | Medio                | Rutas |
-| -----------: | -------------------- | ----: |
-|            3 | Autobús              |   105 |
-|            1 | Metro                |    10 |
-|            7 | Funicular/teleférico |     1 |
-
-Las cinco rutas con más viajes programados son las líneas de metro L5 (4.160), L1 (2.370), L3 (2.284), L4 (2.173) y L2 (2.078). El resto del top 20 lo completan las rutas `1.104.1` (1.865), `1.94.1` (1.856), `1.91.1` (1.796), `1.101.1` (1.782), `1.11.1` (1.413), `2.219.3070` (1.193), `2.24.2840` (1.174), `2.220.2999` (1.090), `2.22.3082` (1.077), `2.229.3024` (863), `2.212.2997` (840), `2.214.3012` (804), `2.208.3476` (794), `2.211.3019` (743) y `2.210.3078` (720).
-
-### Calidad e integridad de datos
-
-No se encontraron filas completamente duplicadas en ninguno de los seis datasets. Tampoco hay paradas sin coordenadas ni referencias rotas en las relaciones principales:
-
-| Comprobación                              | Registros no válidos |
-| ----------------------------------------- | -------------------: |
-| `trips.route_id` sin ruta existente       |                    0 |
-| `stop_times.stop_id` sin parada existente |                    0 |
-| `stop_times.trip_id` sin viaje existente  |                    0 |
-| Paradas sin latitud o longitud            |                    0 |
-
-Los nulos se concentran en campos opcionales o en horarios parciales:
-
-| Dataset      | Campo                 |   Nulos | Interpretación                                        |
-| ------------ | --------------------- | ------: | ----------------------------------------------------- |
-| `stops`      | `stop_url`            |   3.445 | Campo opcional no informado.                          |
-| `stops`      | `parent_station`      |   2.776 | Solo aplica cuando la parada depende de una estación. |
-| `stops`      | `wheelchair_boarding` |     139 | Accesibilidad no informada.                           |
-| `stop_times` | `arrival_time`        | 764.691 | Horario no publicado en esa parada.                   |
-| `stop_times` | `departure_time`      | 764.691 | Horario no publicado en esa parada.                   |
-
-Los horarios ausentes no se imputan: GTFS permite que se interpolen a partir de las paradas con hora publicada cuando el caso de uso lo requiera.
-
-### Transformaciones aplicadas
-
-El pipeline conserva los datos Raw y trabaja sobre una copia. Aplica limpieza de nombres de columna y texto, convierte coordenadas y `stop_sequence` a tipo numérico, elimina duplicados, evita `stop_id` repetidos y descarta filas sin identificadores o sin coordenadas.
-
-Además, después de eliminar espacios, las cadenas vacías se normalizan a `NA`. Esto permite que la regla de eliminación de identificadores las detecte correctamente. En la extracción analizada no se encontraron identificadores vacíos tras esa normalización y ninguna transformación eliminó registros.
-
-| Dataset      | Registros iniciales | Registros finales | Eliminados |
-| ------------ | ------------------: | ----------------: | ---------: |
-| `agency`     |                   1 |                 1 |          0 |
-| `routes`     |                 116 |               116 |          0 |
-| `trips`      |              60.537 |            60.537 |          0 |
-| `stops`      |               3.445 |             3.445 |          0 |
-| `stop_times` |           1.391.617 |         1.391.617 |          0 |
-| `calendar`   |                   4 |                 4 |          0 |
-
-En conjunto, el feed está listo para la siguiente etapa de procesamiento. Los controles de transformación quedan como salvaguarda ante futuras descargas con valores vacíos, tipos no normalizados o duplicados.
-
----
-
-## 📄 Licencia
-
-Este proyecto se desarrolla con fines educativos y de portfolio.
+Proyecto desarrollado con fines educativos y de portfolio.
